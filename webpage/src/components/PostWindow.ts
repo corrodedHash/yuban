@@ -23,8 +23,10 @@ export default defineComponent({
         handlePostSwitch(postid: null | number) {
             if (postid === null) {
                 this.postid = undefined
+                this.$router.push({ path: '/' })
             } else {
                 this.postid = postid
+                this.$router.push({ name: 'View', params: { postid: this.postid } })
             }
         }
     }

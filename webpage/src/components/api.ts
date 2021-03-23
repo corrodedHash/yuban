@@ -8,6 +8,8 @@ export interface Post {
     user: string;
 }
 
+const API_ROOT = "api/"
+
 export function check_login(username: string, password: string, callback: XMLCallback) {
     let loginreq = new XMLHttpRequest();
     loginreq.onreadystatechange = (ev) => {
@@ -17,7 +19,7 @@ export function check_login(username: string, password: string, callback: XMLCal
         username: username,
         password: password,
     });
-    loginreq.open("POST", "/logindata", true);
+    loginreq.open("POST", `/${API_ROOT}logindata`, true);
     loginreq.send(json_data);
 }
 
@@ -26,7 +28,7 @@ export function check_token(callback: XMLCallback) {
     loginreq.onreadystatechange = (ev) => {
         callback(loginreq)
     };
-    loginreq.open("GET", "/testtoken", true);
+    loginreq.open("GET", `/${API_ROOT}testtoken`, true);
     loginreq.send();
 }
 
@@ -35,7 +37,7 @@ export function get_posts(callback: XMLCallback) {
     postreq.onreadystatechange = (ev) => {
         callback(postreq);
     };
-    postreq.open("GET", "/posts", true);
+    postreq.open("GET", `/${API_ROOT}posts`, true);
     postreq.send();
 }
 
@@ -44,7 +46,7 @@ export function get_post(post_id: number, callback: XMLCallback) {
     postreq.onreadystatechange = (ev) => {
         callback(postreq);
     };
-    postreq.open("GET", `/post/${post_id}`, true);
+    postreq.open("GET", `/${API_ROOT}post/${post_id}`, true);
     postreq.send();
 }
 
@@ -53,6 +55,6 @@ export function new_post(post: string, callback: XMLCallback) {
     postreq.onreadystatechange = (ev) => {
         callback(postreq);
     };
-    postreq.open("PUT", "/newpost", true);
+    postreq.open("PUT", `/${API_ROOT}newpost`, true);
     postreq.send(post);
 }

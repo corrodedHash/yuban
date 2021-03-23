@@ -4,10 +4,13 @@
 mod auth;
 mod db;
 
+use std::path::PathBuf;
+
 use auth::AuthorizedUser;
 use db::YubanDatabase;
 use rocket::{
     http::{Cookie, Cookies, Status},
+    response::NamedFile,
     State,
 };
 
@@ -91,6 +94,15 @@ fn single_post(
     Ok(rocket::response::content::Json(json_post))
 }
 
+#[rocket::get("/post/<path..>")]
+fn route_fix(path: PathBuf) -> Option<NamedFile> {
+    NamedFile::open(
+        std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/webpage/dist"))
+            .join("index.html"),
+    )
+    .ok()
+}
+
 fn main() {
     let db = db::YubanDatabase::new().expect("Could not open database");
     match db.new_login("me", "secret") {
@@ -102,9 +114,10 @@ fn main() {
     rocket::ignite()
         .manage(db)
         .mount(
-            "/",
+            "/api",
             rocket::routes![login_post, article_posts, test_token, single_post, new_post],
         )
+        .mount("/", rocket::routes![route_fix])
         .mount(
             "/",
             rocket_contrib::serve::StaticFiles::from(concat!(

@@ -11,9 +11,11 @@ export default defineComponent({
     },
     mounted() {
         if (this.postid !== undefined) {
+            let me = this
             get_post(this.postid, (req) => {
                 if (req.readyState == req.DONE && req.status >= 200 && req.status < 300) {
                     let post: Post = JSON.parse(req.responseText)
+                    me.text = post.text
                 }
             })
         }
@@ -33,7 +35,6 @@ export default defineComponent({
             }
         }
     },
-    components: {},
     methods: {
         handleSubmit() {
             new_post(this.text, (req) => {
