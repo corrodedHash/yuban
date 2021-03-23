@@ -59,6 +59,17 @@ fn test_token(_user: AuthorizedUser) -> rocket::http::Status {
     Status::Accepted
 }
 
+#[rocket::put("/newpost", data = "<data>")]
+fn new_post(
+    user: AuthorizedUser,
+    data: String,
+    db: State<db::YubanDatabase>,
+) -> Result<String, rocket::http::Status> {
+    db.add_post(&user.username, &data)
+        .map_err(|_| Status::InternalServerError)
+        .map(|x| x.to_string())
+}
+
 #[rocket::get("/posts")]
 fn article_posts(
     _user: AuthorizedUser,
@@ -92,7 +103,7 @@ fn main() {
         .manage(db)
         .mount(
             "/",
-            rocket::routes![login_post, article_posts, test_token, single_post],
+            rocket::routes![login_post, article_posts, test_token, single_post, new_post],
         )
         .mount(
             "/",

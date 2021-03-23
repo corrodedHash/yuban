@@ -1,21 +1,15 @@
 <template>
   <div>
-    <login />
-    <posts />
+    <div v-if="!loggedIn">
+      <login @login="loggedIn = true" />
+    </div>
+    <div v-else>
+      <post-window @logout="loggedIn = false" />
+    </div>
   </div>
 </template>
 
-<script lang="ts">
-import { defineComponent } from "vue";
-import Login from "./components/Login.vue";
-import Postlist from "./components/Postlist.vue";
-
-export default defineComponent({
-  name: "App",
-  components: { Login, Postlist },
-});
-</script>
-
+<script lang="ts" src="./App.ts" />
 <style>
 #app {
   font-family: Avenir, Helvetica, Arial, sans-serif;

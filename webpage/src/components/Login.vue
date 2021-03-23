@@ -1,17 +1,23 @@
 <template>
   <div>
     Version 1
-    <form action="logindata" method="POST" @submit.prevent="login">
-      <input type="text" name="username" v-model="username" /><br />
-      <input type="password" name="password" v-model="password" /><br />
-      <input type="submit" value="Submit" />
-    </form>
+    <div
+      v-loading="checkedToken"
+      element-loading-text="Loading..."
+      element-loading-spinner="el-icon-loading"
+    >
+      <form action="logindata" method="POST" @submit.prevent="login">
+        <input type="text" name="username" v-model="username" /><br />
+        <input type="password" name="password" v-model="password" /><br />
+        <input type="submit" value="Submit" />
+      </form>
+    </div>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent } from "vue";
-
+import { check_token, check_login } from "./api";
 export default defineComponent({
   name: "Login",
   emits: {
@@ -23,6 +29,7 @@ export default defineComponent({
     return {
       username: "",
       password: "",
+      checkedToken: false,
     };
   },
   mounted() {
@@ -33,50 +40,44 @@ export default defineComponent({
       if (req.status === 202) {
         console.log("Accepted", req);
         this.$emit("login");
+        this.checkedToken = false;
       } else {
         console.log("Not accepted", req);
+        this.checkedToken = true;
       }
     },
     checkToken() {
       if (document.cookie.indexOf("token=") == -1) {
-        console.log("No Token to test")
+        console.log("No Token to test");
         return;
       }
-      let loginreq = new XMLHttpRequest();
-      loginreq.onreadystatechange = (ev) => {
-        switch (loginreq.readyState) {
+
+      check_token((req: XMLHttpRequest) => {
+        switch (req.readyState) {
           case 0:
           case 1:
           case 2:
           case 3:
             return;
           case 4:
-            this.handleDoneRequest(loginreq);
+            this.handleDoneRequest(req);
         }
-      };
-      loginreq.open("GET", "/testtoken", true);
-      loginreq.send();
+      });
     },
     login() {
       let loginreq = new XMLHttpRequest();
-      loginreq.onreadystatechange = (ev) => {
-        switch (loginreq.readyState) {
+      check_login(this.username, this.password, (req: XMLHttpRequest) => {
+        switch (req.readyState) {
           case 0:
           case 1:
           case 2:
           case 3:
+            console.log("Ready", req.readyState);
             return;
           case 4:
-            this.handleDoneRequest(loginreq);
+            this.handleDoneRequest(req);
         }
-      };
-      let json_data = JSON.stringify({
-        username: this.username,
-        password: this.password,
       });
-      loginreq.open("POST", "/logindata", true);
-      loginreq.send(json_data);
-      console.log("Sending", json_data);
 
       this.username = "";
       this.password = "";

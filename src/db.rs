@@ -7,12 +7,30 @@ use mysql::{
 use rand::RngCore;
 use sha2::{digest::FixedOutput, Digest, Sha256};
 
-#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Serialize)]
 pub struct Post {
     pub id: usize,
-    pub posttime: String,
+    #[serde(serialize_with = "serialize_date")]
+    pub posttime: mysql::Value,
     pub text: String,
     pub user: String,
+}
+
+fn serialize_date<S: serde::Serializer>(x: &mysql::Value, s: S) -> Result<S::Ok, S::Error> {
+    use serde::ser::Error;
+    if let mysql::Value::Date(year, month, day, hour, minutes, seconds, ms) = x {
+        s.serialize_str(&format!(
+            "{}-{}-{} {}:{}:{}.{}",
+            year, month, day, hour, minutes, seconds, ms
+        ))
+    } else if let mysql::Value::Bytes(x) = x {
+        s.serialize_str(
+            &std::str::from_utf8(x).map_err(|_| S::Error::custom("UTF-8 error in date"))?,
+        )
+    } else {
+        dbg!(x);
+        Err(S::Error::custom("Value not a date"))
+    }
 }
 
 impl FromRow for Post {
@@ -75,6 +93,43 @@ impl YubanDatabase {
         self.pool.try_get_conn(500).map_err(|_| ())
     }
 
+    pub fn add_post(&self, username: &str, post: &str) -> Result<u64, ()> {
+        const STATEMENT_STRING_ID: &str = "SELECT id FROM Users WHERE username = :username";
+        const STATEMENT_STRING_INSERT: &str = concat!(
+            "INSERT INTO Posts (userid, postdate, post) ",
+            "VALUES (:userid, CURRENT_TIMESTAMP, :post)",
+        );
+        let mut conn = self.get_conn()?;
+        let mut transaction = conn
+            .start_transaction(mysql::TxOpts::default())
+            .map_err(|err| {
+                dbg!(err);
+            })?;
+        let statement = transaction.prep(STATEMENT_STRING_ID).map_err(|err| {
+            dbg!(err);
+        })?;
+        let params = params! {"username" => username};
+        let userid: usize = transaction
+            .exec_first(statement, params)
+            .map_err(|err| {
+                dbg!(err);
+            })?
+            .ok_or(())?;
+
+        let statement = transaction.prep(STATEMENT_STRING_INSERT).map_err(|err| {
+            dbg!(err);
+        })?;
+        let params = params! {"userid" => userid, "post" => post};
+        transaction.exec_drop(statement, params).map_err(|err| {
+            dbg!(err);
+        })?;
+        let postid = transaction.last_insert_id().ok_or(())?;
+        transaction.commit().map_err(|err| {
+            dbg!(err);
+        })?;
+        Ok(postid)
+    }
+
     pub fn get_post(&self, postid: usize) -> Result<Post, ()> {
         const STATEMENT_STRING: &str = concat!(
             "SELECT Posts.id, Posts.postdate, Posts.post, Users.username ",
@@ -96,9 +151,9 @@ impl YubanDatabase {
 
     pub fn list_posts(&self) -> Result<Vec<Post>, ()> {
         const STATEMENT_STRING: &str = concat!(
-            "SELECT Posts.id, Posts.postdate, SUBSTRING(Posts.post,0,10), Users.username ",
+            "SELECT Posts.id, Posts.postdate, SUBSTRING(Posts.post, 1, 10), Users.username ",
             "FROM Posts INNER JOIN Users ",
-            "ON Posts.userid = Users.id ",
+            "ON Posts.userid = Users.id",
         );
 
         let mut conn = self.get_conn()?;
@@ -111,7 +166,7 @@ impl YubanDatabase {
         let mut conn = self.get_conn()?;
         const STATEMENT_STRING: &str = concat!(
             "INSERT INTO Tokens (userid, token, issuedate) ",
-            "VALUES (:userid,:token, CURRENT_TIMESTAMP) ",
+            "VALUES (:userid, :token, CURRENT_TIMESTAMP) ",
             "ON DUPLICATE KEY UPDATE token = :token, issuedate = CURRENT_TIMESTAMP"
         );
 
