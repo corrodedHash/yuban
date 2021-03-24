@@ -12,7 +12,13 @@ const routes: Array<RouteRecordRaw> = [
     path: '/post/:postid',
     name: 'View',
     component: PostEditor,
-    props: route => ({ postid: parseInt(route.params.postid as string) })
+    props: route => ({ postid: parseInt(route.params.postid as string), threadid: undefined })
+  },
+  {
+    path: '/newpost/:threadid',
+    name: 'NewPost',
+    component: PostEditor,
+    props: route => ({ postid: undefined, threadid: parseInt(route.params.threadid as string) })
   }
 ]
 

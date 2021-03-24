@@ -41,6 +41,7 @@ export default defineComponent({
                 this.checkedToken = true;
             })
         },
+        
         login() {
             let loginreq = new XMLHttpRequest();
             check_login(this.username, this.password)

@@ -11,22 +11,20 @@ export default defineComponent({
             return true
         }
     },
-    data() {
-        return { postid: undefined as number | undefined }
-    },
     methods: {
         handleLogout() {
             document.cookie = "token=;expires=Thu, 01-Jan-1970 00:00:00 GMT"
             document.cookie = "username=;expires=Thu, 01-Jan-1970 00:00:00 GMT"
             this.$emit('logout')
         },
-        handlePostSwitch(postid: null | number) {
-            if (postid === null) {
-                this.postid = undefined
+        handlePostSwitch(thread_id: number | null, post_id: number | null) {
+            if (post_id === null && thread_id === null) {
                 this.$router.push({ path: '/' })
-            } else {
-                this.postid = postid
-                this.$router.push({ name: 'View', params: { postid: this.postid } })
+            } else if (post_id !== null && thread_id === null) {
+            } else if (post_id !== null && thread_id !== null) {
+                this.$router.push({ name: 'View', params: { postid: post_id } })
+            } else if (post_id === null && thread_id !== null) {
+                this.$router.push({ name: "NewPost", params: { threadid: thread_id } })
             }
         }
     }

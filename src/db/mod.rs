@@ -7,6 +7,8 @@ use mysql::{
 use rand::RngCore;
 use sha2::{digest::FixedOutput, Digest, Sha256};
 
+mod transactional;
+
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct Post {
     pub thread_id: u64,
@@ -125,64 +127,6 @@ fn generate_salt() -> Vec<u8> {
     salt_vec.to_vec()
 }
 
-mod transactional_yuban {
-    use mysql::{params, prelude::Queryable, Transaction};
-
-    pub(super) fn get_user_id(username: &str, transaction: &mut Transaction) -> Result<u64, ()> {
-        const STATEMENT_STRING_ID: &str = "SELECT id FROM Users WHERE username = :username";
-
-        let statement = transaction.prep(STATEMENT_STRING_ID).map_err(|err| {
-            dbg!(err);
-        })?;
-        let params = params! {"username" => username};
-        transaction
-            .exec_first(statement, params)
-            .map_err(|err| {
-                dbg!(err);
-            })?
-            .ok_or(())
-    }
-    pub(super) fn post(user_id: u64, post: &str, transaction: &mut Transaction) -> Result<u64, ()> {
-        const STATEMENT_STRING_INSERT: &str = concat!(
-            "INSERT INTO Posts (userid, postdate, post) ",
-            "VALUES (:userid, CURRENT_TIMESTAMP, :post)",
-        );
-        let statement = transaction.prep(STATEMENT_STRING_INSERT).map_err(|err| {
-            dbg!(err);
-        })?;
-        let params = params! {"userid" => user_id, "post" => post};
-        transaction.exec_drop(statement, params).map_err(|err| {
-            dbg!(err);
-        })?;
-        let postid = transaction.last_insert_id().ok_or(())?;
-        Ok(postid)
-    }
-
-    pub(super) fn link_orig(
-        thread_id: u64,
-        post_id: u64,
-        langcode: &str,
-        transaction: &mut Transaction,
-    ) -> Result<(), ()> {
-        const STATEMENT_STRING_ORIG_LINK: &str = concat!(
-            "INSERT INTO Originals (thread_id, post_id, langcode) ",
-            "VALUES (:thread_id, :post_id, :langcode)"
-        );
-
-        let statement = transaction
-            .prep(STATEMENT_STRING_ORIG_LINK)
-            .map_err(|err| {
-                dbg!(err);
-            })?;
-        let params =
-            params! {"thread_id" => thread_id, "post_id" => post_id, "langcode" => langcode};
-        transaction.exec_drop(statement, params).map_err(|err| {
-            dbg!(err);
-        })?;
-        Ok(())
-    }
-}
-
 pub struct YubanDatabase {
     pool: mysql::Pool,
 }
@@ -222,9 +166,9 @@ impl YubanDatabase {
             .map_err(|err| {
                 dbg!(err);
             })?;
-        let user_id = transactional_yuban::get_user_id(username, &mut transaction)?;
-        let post_id = transactional_yuban::post(user_id, post, &mut transaction)?;
-        transactional_yuban::link_orig(thread_id, post_id, langcode, &mut transaction)
+        let user_id = transactional::get_user_id(username, &mut transaction)?;
+        let post_id = transactional::post(user_id, post, &mut transaction)?;
+        transactional::link_orig(thread_id, post_id, langcode, &mut transaction)
             .map(|_| post_id)?;
 
         transaction.commit().map_err(|err| {
@@ -249,7 +193,7 @@ impl YubanDatabase {
             .map_err(|err| {
                 dbg!(err);
             })?;
-        let user_id = transactional_yuban::get_user_id(username, &mut transaction)?;
+        let user_id = transactional::get_user_id(username, &mut transaction)?;
 
         let statement = transaction.prep(STATEMENT_STRING).map_err(|err| {
             dbg!(err);
@@ -259,8 +203,8 @@ impl YubanDatabase {
             dbg!(err);
         })?;
         let thread_id = transaction.last_insert_id().ok_or(())?;
-        let post_id = transactional_yuban::post(user_id, post, &mut transaction)?;
-        transactional_yuban::link_orig(thread_id, post_id, langcode, &mut transaction)
+        let post_id = transactional::post(user_id, post, &mut transaction)?;
+        transactional::link_orig(thread_id, post_id, langcode, &mut transaction)
             .map(|_| post_id)?;
 
         transaction.commit().map_err(|err| {
@@ -280,8 +224,8 @@ impl YubanDatabase {
             .map_err(|err| {
                 dbg!(err);
             })?;
-        let user_id = transactional_yuban::get_user_id(username, &mut transaction)?;
-        let postid = transactional_yuban::post(user_id, post, &mut transaction)?;
+        let user_id = transactional::get_user_id(username, &mut transaction)?;
+        let postid = transactional::post(user_id, post, &mut transaction)?;
 
         let statement = transaction
             .prep(STATEMENT_STRING_ORIG_LINK)
@@ -317,7 +261,6 @@ impl YubanDatabase {
             env!("CARGO_MANIFEST_DIR"),
             "/queries/list_original_posts.sql"
         ));
-        println!("{}", STATEMENT_STRING);
         let mut conn = self.get_conn()?;
         conn.query(STATEMENT_STRING).map_err(|err| {
             dbg!(err);

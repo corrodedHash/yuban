@@ -5,66 +5,43 @@
       icon="el-icon-plus"
       style="width: 100%"
       @click="selectNew"
-      >Add Post</el-button
+      >Add Thread</el-button
     >
-    <el-table
-      ref="postList"
-      :data="tableData"
-      highlight-current-row
-      @current-change="handleSelectedPost"
-    >
-      <el-table-column prop="user" label="Name" />
-      <el-table-column prop="text" label="Address" />
-      <el-table-column prop="posttime" label="Date" />
-    </el-table>
+    <el-collapse ref="postList" accordion>
+      <el-collapse-item
+        v-for="thread in tableData"
+        :key="thread.id"
+        :name="thread.id"
+      >
+        <template #title> {{ thread.user }} - {{ thread.posttime }} </template>
+        <el-button
+          icon="el-icon-plus"
+          style="width: 100%"
+          @click="selectNewPost(thread.id)"
+          >Add Language</el-button
+        >
+        <el-card
+          shadow="hover"
+          v-for="post in thread.posts"
+          :key="post.id"
+          class="postCard"
+          @click="handleSelectedPost(thread.id, post)"
+        >
+          {{ post.user }} - {{ post.date }}<br />{{ post.text }}
+        </el-card>
+      </el-collapse-item>
+    </el-collapse>
     <el-button @click="requestPosts">Get</el-button>
   </div>
 </template>
 
-<script lang="ts">
-import { defineComponent } from "vue";
-import { get_posts, Post } from "./api";
-
-export default defineComponent({
-  name: "PostList",
-  emits: {
-    selectPost(id: number | null) {
-      return true;
-    },
-  },
-  data() {
-    return {
-      posts: [] as Post[],
-    };
-  },
-  mounted() {
-    this.requestPosts();
-  },
-  computed: {
-    tableData(): Post[] {
-      return this.posts;
-    },
-  },
-  methods: {
-    selectNew() {
-      this.$emit("selectPost", null);
-      (this.$refs.postList as any).setCurrentRow();
-    },
-    handleSelectedPost(index: Post) {
-      if (index !== null) {
-        console.log("Selected: ", index);
-        this.$emit("selectPost", index.id);
-      }
-    },
-    requestPosts() {
-      let me = this;
-      get_posts().then((posts) => {
-        me.posts = posts as any;
-      });
-    },
-  },
-});
-</script>
+<script lang="ts" src="./PostList.ts"/>
 
 <style scoped>
+.postCard {
+  cursor: pointer;
+}
+.postCard:hover {
+  cursor: pointer;
+}
 </style>

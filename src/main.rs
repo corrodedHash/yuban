@@ -144,8 +144,16 @@ fn single_post(
     Ok(rocket::response::content::Json(json_post))
 }
 
-#[rocket::get("/post/<path..>")]
-fn route_fix(path: PathBuf) -> Option<NamedFile> {
+#[rocket::get("/post/<path..>", rank = 8)]
+fn post_route_fix(path: PathBuf) -> Option<NamedFile> {
+    NamedFile::open(
+        std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/webpage/dist"))
+            .join("index.html"),
+    )
+    .ok()
+}
+#[rocket::get("/newpost/<path..>", rank = 8)]
+fn newpost_route_fix(path: PathBuf) -> Option<NamedFile> {
     NamedFile::open(
         std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/webpage/dist"))
             .join("index.html"),
@@ -175,7 +183,7 @@ fn main() {
                 new_correction
             ],
         )
-        .mount("/", rocket::routes![route_fix])
+        .mount("/", rocket::routes![post_route_fix, newpost_route_fix])
         .mount(
             "/",
             rocket_contrib::serve::StaticFiles::from(concat!(
