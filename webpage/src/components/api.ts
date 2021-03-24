@@ -50,11 +50,11 @@ export function get_post(post_id: number, callback: XMLCallback) {
     postreq.send();
 }
 
-export function new_post(post: string, callback: XMLCallback) {
+export function new_post(post: string, langcode: string, callback: XMLCallback) {
     let postreq = new XMLHttpRequest();
     postreq.onreadystatechange = (ev) => {
         callback(postreq);
     };
-    postreq.open("PUT", `/${API_ROOT}newpost`, true);
+    postreq.open("PUT", `/${API_ROOT}newpost/${langcode}`, true);
     postreq.send(post);
 }

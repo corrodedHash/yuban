@@ -10,18 +10,22 @@ export default defineComponent({
         return { text: "" };
     },
     mounted() {
-        if (this.postid !== undefined) {
-            let me = this
-            get_post(this.postid, (req) => {
-                if (req.readyState == req.DONE && req.status >= 200 && req.status < 300) {
-                    let post: Post = JSON.parse(req.responseText)
-                    me.text = post.text
-                }
-            })
-        }
+        this.handlePostChange()
     },
     watch: {
         postid(newPostID: number | undefined) {
+            this.handlePostChange()
+            console.log(newPostID)
+            console.log(this.postid)
+        }
+    },
+    computed: {
+        canEdit(): boolean {
+            return this.postid === undefined
+        }
+    },
+    methods: {
+        handlePostChange() {
             let me = this
             if (this.postid !== undefined) {
                 get_post(this.postid, (req) => {
@@ -33,11 +37,12 @@ export default defineComponent({
             } else {
                 this.text = ""
             }
-        }
-    },
-    methods: {
+        },
         handleSubmit() {
-            new_post(this.text, (req) => {
+            if (this.postid !== undefined) {
+                return
+            }
+            new_post(this.text, (this.$refs.langcode as any).value, (req) => {
                 if (req.readyState === 4) {
                     if (req.status === 200) {
                     } else {

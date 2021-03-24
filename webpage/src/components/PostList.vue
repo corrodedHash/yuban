@@ -48,6 +48,7 @@ export default defineComponent({
   methods: {
     selectNew() {
       this.$emit("selectPost", null);
+      (this.$refs.postList as any).setCurrentRow()
     },
     handleSelectedPost(index: Post) {
       if (index !== null) {

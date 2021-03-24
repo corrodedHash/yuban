@@ -17,13 +17,49 @@ CREATE TABLE Tokens (
         ON DELETE CASCADE
 );
 
+CREATE TABLE Threads (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    owner_id INT UNSIGNED NOT NULL,
+    opened_on TIMESTAMP NOT NULL,
+
+    FOREIGN KEY (owner_id)
+        REFERENCES Users(id)
+        ON DELETE CASCADE
+);
+
 CREATE TABLE Posts (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     userid INT UNSIGNED NOT NULL,
     postdate TIMESTAMP NOT NULL,
     post MEDIUMTEXT NOT NULL,
+
     FOREIGN KEY (userid)
         REFERENCES Users(id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE Originals (
+    thread_id INT UNSIGNED NOT NULL,
+    post_id INT UNSIGNED NOT NULL,
+    langcode VARCHAR(2) NOT NULL,
+
+    FOREIGN KEY (thread_id)
+        REFERENCES Threads(id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (post_id)
+        REFERENCES Posts(id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE Corrections (
+    orig_id INT UNSIGNED NOT NULL,
+    post_id INT UNSIGNED NOT NULL,
+
+    FOREIGN KEY (orig_id)
+        REFERENCES Originals(post_id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (post_id)
+        REFERENCES Posts(id)
         ON DELETE CASCADE
 );
 

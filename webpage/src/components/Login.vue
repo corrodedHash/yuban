@@ -2,7 +2,7 @@
   <div>
     Version 1
     <div
-      v-loading="checkedToken"
+      v-loading="!checkedToken"
       element-loading-text="Loading..."
       element-loading-spinner="el-icon-loading"
     >

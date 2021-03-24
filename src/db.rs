@@ -1,4 +1,4 @@
-use crate::auth::AccessToken;
+use crate::{auth::AccessToken, LangCode};
 use mysql::{
     params,
     prelude::{FromRow, Queryable},
@@ -9,11 +9,78 @@ use sha2::{digest::FixedOutput, Digest, Sha256};
 
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct Post {
-    pub id: usize,
+    pub id: u64,
     #[serde(serialize_with = "serialize_date")]
     pub posttime: mysql::Value,
     pub text: String,
     pub user: String,
+    pub langcode: LangCode,
+}
+
+impl FromRow for Post {
+    fn from_row_opt(row: mysql::Row) -> Result<Self, mysql::FromRowError>
+    where
+        Self: Sized,
+    {
+        let (id, posttime, text, user, langcode) = mysql::prelude::FromRow::from_row_opt(row)?;
+        Ok(Self {
+            id,
+            posttime,
+            text,
+            user,
+            langcode: LangCode(langcode),
+        })
+    }
+}
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct ThreadSummary {
+    pub id: u64,
+    #[serde(serialize_with = "serialize_date")]
+    pub posttime: mysql::Value,
+    pub user: String,
+    pub posts: String,
+}
+
+impl FromRow for ThreadSummary {
+    fn from_row_opt(row: mysql::Row) -> Result<Self, mysql::FromRowError>
+    where
+        Self: Sized,
+    {
+        let (id, posttime, user, posts) = mysql::prelude::FromRow::from_row_opt(row)?;
+        Ok(Self {
+            id,
+            posttime,
+            user,
+            posts,
+        })
+    }
+}
+
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct CorrectionPostSummary {
+    pub id: u64,
+    pub ellipse: String,
+    pub author: String,
+    #[serde(serialize_with = "serialize_date")]
+    pub posttime: mysql::Value,
+}
+
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct TranslationPostSummary {
+    pub id: u64,
+    pub ellipse: String,
+    pub author: String,
+    pub langcode: String,
+    #[serde(serialize_with = "serialize_date")]
+    pub posttime: mysql::Value,
+    pub corrections: Vec<CorrectionPostSummary>,
+}
+
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct OriginalPostSummary {
+    pub post: Post,
+    pub translations: Vec<TranslationPostSummary>,
+    pub corrections: Vec<CorrectionPostSummary>,
 }
 
 fn serialize_date<S: serde::Serializer>(x: &mysql::Value, s: S) -> Result<S::Ok, S::Error> {
@@ -30,21 +97,6 @@ fn serialize_date<S: serde::Serializer>(x: &mysql::Value, s: S) -> Result<S::Ok,
     } else {
         dbg!(x);
         Err(S::Error::custom("Value not a date"))
-    }
-}
-
-impl FromRow for Post {
-    fn from_row_opt(row: mysql::Row) -> Result<Self, mysql::FromRowError>
-    where
-        Self: Sized,
-    {
-        let (id, posttime, text, user) = mysql::prelude::FromRow::from_row_opt(row)?;
-        Ok(Self {
-            id,
-            posttime,
-            text,
-            user,
-        })
     }
 }
 
@@ -66,6 +118,64 @@ fn generate_salt() -> Vec<u8> {
     let mut salt_vec = [0_u8; 16];
     rand::thread_rng().fill_bytes(&mut salt_vec);
     salt_vec.to_vec()
+}
+
+mod transactional_yuban {
+    use mysql::{params, prelude::Queryable, Transaction};
+
+    pub(super) fn get_user_id(username: &str, transaction: &mut Transaction) -> Result<u64, ()> {
+        const STATEMENT_STRING_ID: &str = "SELECT id FROM Users WHERE username = :username";
+
+        let statement = transaction.prep(STATEMENT_STRING_ID).map_err(|err| {
+            dbg!(err);
+        })?;
+        let params = params! {"username" => username};
+        transaction
+            .exec_first(statement, params)
+            .map_err(|err| {
+                dbg!(err);
+            })?
+            .ok_or(())
+    }
+    pub(super) fn post(user_id: u64, post: &str, transaction: &mut Transaction) -> Result<u64, ()> {
+        const STATEMENT_STRING_INSERT: &str = concat!(
+            "INSERT INTO Posts (userid, postdate, post) ",
+            "VALUES (:userid, CURRENT_TIMESTAMP, :post)",
+        );
+        let statement = transaction.prep(STATEMENT_STRING_INSERT).map_err(|err| {
+            dbg!(err);
+        })?;
+        let params = params! {"userid" => user_id, "post" => post};
+        transaction.exec_drop(statement, params).map_err(|err| {
+            dbg!(err);
+        })?;
+        let postid = transaction.last_insert_id().ok_or(())?;
+        Ok(postid)
+    }
+
+    pub(super) fn link_orig(
+        thread_id: u64,
+        post_id: u64,
+        langcode: &str,
+        transaction: &mut Transaction,
+    ) -> Result<(), ()> {
+        const STATEMENT_STRING_ORIG_LINK: &str = concat!(
+            "INSERT INTO Originals (thread_id, post_id, langcode) ",
+            "VALUES (:thread_id, :post_id, :langcode)"
+        );
+
+        let statement = transaction
+            .prep(STATEMENT_STRING_ORIG_LINK)
+            .map_err(|err| {
+                dbg!(err);
+            })?;
+        let params =
+            params! {"thread_id" => thread_id, "post_id" => post_id, "langcode" => langcode};
+        transaction.exec_drop(statement, params).map_err(|err| {
+            dbg!(err);
+        })?;
+        Ok(())
+    }
 }
 
 pub struct YubanDatabase {
@@ -93,11 +203,40 @@ impl YubanDatabase {
         self.pool.try_get_conn(500).map_err(|_| ())
     }
 
-    pub fn add_post(&self, username: &str, post: &str) -> Result<u64, ()> {
-        const STATEMENT_STRING_ID: &str = "SELECT id FROM Users WHERE username = :username";
-        const STATEMENT_STRING_INSERT: &str = concat!(
-            "INSERT INTO Posts (userid, postdate, post) ",
-            "VALUES (:userid, CURRENT_TIMESTAMP, :post)",
+    pub fn add_post(
+        &self,
+        username: &str,
+        post: &str,
+        thread_id: u64,
+        langcode: &str,
+    ) -> Result<u64, ()> {
+        let mut conn = self.get_conn()?;
+
+        let mut transaction = conn
+            .start_transaction(mysql::TxOpts::default())
+            .map_err(|err| {
+                dbg!(err);
+            })?;
+        let user_id = transactional_yuban::get_user_id(username, &mut transaction)?;
+        let post_id = transactional_yuban::post(user_id, post, &mut transaction)?;
+        transactional_yuban::link_orig(thread_id, post_id, langcode, &mut transaction)
+            .map(|_| post_id)?;
+
+        transaction.commit().map_err(|err| {
+            dbg!(err);
+        })?;
+        Ok(post_id)
+    }
+
+    pub fn add_new_thread(
+        &self,
+        username: &str,
+        post: &str,
+        langcode: &str,
+    ) -> Result<(u64, u64), ()> {
+        const STATEMENT_STRING: &str = concat!(
+            "INSERT INTO Threads (owner_id, opened_on) ",
+            "VALUES (:owner_id, CURRENT_TIMESTAMP) "
         );
         let mut conn = self.get_conn()?;
         let mut transaction = conn
@@ -105,25 +244,49 @@ impl YubanDatabase {
             .map_err(|err| {
                 dbg!(err);
             })?;
-        let statement = transaction.prep(STATEMENT_STRING_ID).map_err(|err| {
-            dbg!(err);
-        })?;
-        let params = params! {"username" => username};
-        let userid: usize = transaction
-            .exec_first(statement, params)
-            .map_err(|err| {
-                dbg!(err);
-            })?
-            .ok_or(())?;
+        let user_id = transactional_yuban::get_user_id(username, &mut transaction)?;
 
-        let statement = transaction.prep(STATEMENT_STRING_INSERT).map_err(|err| {
+        let statement = transaction.prep(STATEMENT_STRING).map_err(|err| {
             dbg!(err);
         })?;
-        let params = params! {"userid" => userid, "post" => post};
+        let params = params! {"owner_id" => user_id};
         transaction.exec_drop(statement, params).map_err(|err| {
             dbg!(err);
         })?;
-        let postid = transaction.last_insert_id().ok_or(())?;
+        let thread_id = transaction.last_insert_id().ok_or(())?;
+        let post_id = transactional_yuban::post(user_id, post, &mut transaction)?;
+        transactional_yuban::link_orig(thread_id, post_id, langcode, &mut transaction)
+            .map(|_| post_id)?;
+
+        transaction.commit().map_err(|err| {
+            dbg!(err);
+        })?;
+        Ok((thread_id, post_id))
+    }
+
+    pub fn add_correction(&self, username: &str, post: &str, orig_id: u64) -> Result<u64, ()> {
+        const STATEMENT_STRING_ORIG_LINK: &str = concat!(
+            "INSERT INTO Corrections (orig_id, post_id) ",
+            "VALUES (:orig_id, :post_id)"
+        );
+        let mut conn = self.get_conn()?;
+        let mut transaction = conn
+            .start_transaction(mysql::TxOpts::default())
+            .map_err(|err| {
+                dbg!(err);
+            })?;
+        let user_id = transactional_yuban::get_user_id(username, &mut transaction)?;
+        let postid = transactional_yuban::post(user_id, post, &mut transaction)?;
+
+        let statement = transaction
+            .prep(STATEMENT_STRING_ORIG_LINK)
+            .map_err(|err| {
+                dbg!(err);
+            })?;
+        let params = params! {"orig_id" => orig_id, "post_id" => postid};
+        transaction.exec_drop(statement, params).map_err(|err| {
+            dbg!(err);
+        })?;
         transaction.commit().map_err(|err| {
             dbg!(err);
         })?;
@@ -132,12 +295,26 @@ impl YubanDatabase {
 
     pub fn get_post(&self, postid: usize) -> Result<Post, ()> {
         const STATEMENT_STRING: &str = concat!(
-            "SELECT Posts.id, Posts.postdate, Posts.post, Users.username ",
-            "FROM Posts INNER JOIN Users ",
-            "ON Posts.userid = Users.id ",
-            "WHERE Posts.id = :postid"
+            "SELECT Posts.id, Posts.postdate, SUBSTRING(Posts.post, 1, 10), Users.username, Originals.langcode ",
+            "FROM Posts ",
+            "INNER JOIN Users ON Posts.userid = Users.id ",
+            "INNER JOIN Originals ON Posts.id = Originals.post_id ",
+            "WHERE Posts.id = :postid ",
+            "UNION ",
+            "SELECT Posts.id, Posts.postdate, SUBSTRING(Posts.post, 1, 10), Users.username, Translations.langcode ",
+            "FROM Posts ",
+            "INNER JOIN Users ON Posts.userid = Users.id ",
+            "INNER JOIN Translations ON Posts.id = Translations.from_id ",
+            "WHERE Posts.id = :postid ",
+            "UNION ",
+            "SELECT Posts.id, Posts.postdate, SUBSTRING(Posts.post, 1, 10), Users.username, Originals.langcode ",
+            "FROM Posts ",
+            "INNER JOIN Users ON Posts.userid = Users.id ",
+            "INNER JOIN Corrections ON Posts.id = Corrections.post_id ",
+            "INNER JOIN Originals ON Corrections.orig_id = Originals.post_id ",
+            "WHERE Posts.id = :postid ",
+            "LIMIT 1 ",
         );
-
         let mut conn = self.get_conn()?;
         let statement = conn.prep(STATEMENT_STRING).map_err(|err| {
             dbg!(err);
@@ -149,13 +326,12 @@ impl YubanDatabase {
             .and_then(|p| p.ok_or(()))
     }
 
-    pub fn list_posts(&self) -> Result<Vec<Post>, ()> {
-        const STATEMENT_STRING: &str = concat!(
-            "SELECT Posts.id, Posts.postdate, SUBSTRING(Posts.post, 1, 10), Users.username ",
-            "FROM Posts INNER JOIN Users ",
-            "ON Posts.userid = Users.id",
-        );
-
+    pub fn list_original_posts(&self) -> Result<Vec<ThreadSummary>, ()> {
+        const STATEMENT_STRING: &str = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/queries/list_original_posts.sql"
+        ));
+        println!("{}", STATEMENT_STRING);
         let mut conn = self.get_conn()?;
         conn.query(STATEMENT_STRING).map_err(|err| {
             dbg!(err);
@@ -240,6 +416,7 @@ impl YubanDatabase {
         };
         conn.exec_drop(statement, params).map_err(|_| ())
     }
+
     pub fn check_login(&self, name: &str, pass: &str) -> Result<usize, ()> {
         let mut conn = self.get_conn()?;
         let statement = conn
