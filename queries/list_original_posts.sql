@@ -8,7 +8,7 @@ FROM
         SELECT
             Threads.id AS id,
             Threads.opened_on AS opened_on,
-            threaduser.id as user,
+            threaduser.username as user,
             JSON_OBJECT(
                 'id',
                 Posts.id,

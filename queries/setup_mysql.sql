@@ -40,7 +40,7 @@ CREATE TABLE Posts (
 
 CREATE TABLE Originals (
     thread_id INT UNSIGNED NOT NULL,
-    post_id INT UNSIGNED NOT NULL,
+    post_id INT UNSIGNED NOT NULL PRIMARY KEY,
     langcode VARCHAR(2) NOT NULL,
 
     FOREIGN KEY (thread_id)
@@ -53,7 +53,7 @@ CREATE TABLE Originals (
 
 CREATE TABLE Corrections (
     orig_id INT UNSIGNED NOT NULL,
-    post_id INT UNSIGNED NOT NULL,
+    post_id INT UNSIGNED NOT NULL PRIMARY KEY,
 
     FOREIGN KEY (orig_id)
         REFERENCES Originals(post_id)

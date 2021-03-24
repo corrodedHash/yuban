@@ -48,7 +48,7 @@ export default defineComponent({
   methods: {
     selectNew() {
       this.$emit("selectPost", null);
-      (this.$refs.postList as any).setCurrentRow()
+      (this.$refs.postList as any).setCurrentRow();
     },
     handleSelectedPost(index: Post) {
       if (index !== null) {
@@ -58,10 +58,8 @@ export default defineComponent({
     },
     requestPosts() {
       let me = this;
-      get_posts((req: XMLHttpRequest) => {
-        if (req.readyState === 4 && req.status === 200) {
-          me.posts = JSON.parse(req.responseText);
-        }
+      get_posts().then((posts) => {
+        me.posts = posts as any;
       });
     },
   },

@@ -9,12 +9,14 @@ use sha2::{digest::FixedOutput, Digest, Sha256};
 
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct Post {
+    pub thread_id: u64,
     pub id: u64,
     #[serde(serialize_with = "serialize_date")]
     pub posttime: mysql::Value,
-    pub text: String,
     pub user: String,
     pub langcode: LangCode,
+    pub correction_for: Option<u64>,
+    pub text: String,
 }
 
 impl FromRow for Post {
@@ -22,13 +24,16 @@ impl FromRow for Post {
     where
         Self: Sized,
     {
-        let (id, posttime, text, user, langcode) = mysql::prelude::FromRow::from_row_opt(row)?;
+        let (thread_id, id, posttime, user, langcode, correction_for, text) =
+            mysql::prelude::FromRow::from_row_opt(row)?;
         Ok(Self {
+            thread_id,
             id,
             posttime,
-            text,
             user,
             langcode: LangCode(langcode),
+            correction_for,
+            text,
         })
     }
 }
@@ -294,27 +299,8 @@ impl YubanDatabase {
     }
 
     pub fn get_post(&self, postid: usize) -> Result<Post, ()> {
-        const STATEMENT_STRING: &str = concat!(
-            "SELECT Posts.id, Posts.postdate, SUBSTRING(Posts.post, 1, 10), Users.username, Originals.langcode ",
-            "FROM Posts ",
-            "INNER JOIN Users ON Posts.userid = Users.id ",
-            "INNER JOIN Originals ON Posts.id = Originals.post_id ",
-            "WHERE Posts.id = :postid ",
-            "UNION ",
-            "SELECT Posts.id, Posts.postdate, SUBSTRING(Posts.post, 1, 10), Users.username, Translations.langcode ",
-            "FROM Posts ",
-            "INNER JOIN Users ON Posts.userid = Users.id ",
-            "INNER JOIN Translations ON Posts.id = Translations.from_id ",
-            "WHERE Posts.id = :postid ",
-            "UNION ",
-            "SELECT Posts.id, Posts.postdate, SUBSTRING(Posts.post, 1, 10), Users.username, Originals.langcode ",
-            "FROM Posts ",
-            "INNER JOIN Users ON Posts.userid = Users.id ",
-            "INNER JOIN Corrections ON Posts.id = Corrections.post_id ",
-            "INNER JOIN Originals ON Corrections.orig_id = Originals.post_id ",
-            "WHERE Posts.id = :postid ",
-            "LIMIT 1 ",
-        );
+        const STATEMENT_STRING: &str =
+            include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/queries/get_post.sql"));
         let mut conn = self.get_conn()?;
         let statement = conn.prep(STATEMENT_STRING).map_err(|err| {
             dbg!(err);

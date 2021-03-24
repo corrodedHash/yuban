@@ -51,11 +51,11 @@ fn login_post(
     data: rocket_contrib::json::Json<LoginData>,
     mut cookies: Cookies,
     db: State<db::YubanDatabase>,
-) -> Status {
+) -> Result<rocket::response::content::Json<String>, Status> {
     if let Ok(user_id) = db.check_login(&data.username, &data.password) {
         let token = match db.add_token(user_id) {
             Ok(t) => t,
-            Err(_) => return Status::BadGateway,
+            Err(_) => return Err(Status::BadGateway),
         };
         let str_token = base64::encode(token.as_ref());
         cookies.add(
@@ -74,9 +74,9 @@ fn login_post(
                 .path("/")
                 .finish(),
         );
-        return Status::Accepted;
+        return Ok(rocket::response::content::Json("true".to_owned()));
     }
-    Status::Forbidden
+    Ok(rocket::response::content::Json("false".to_owned()))
 }
 
 #[rocket::get("/testtoken")]
