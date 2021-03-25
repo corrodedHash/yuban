@@ -12,6 +12,9 @@ export default defineComponent({
         }
     },
     methods: {
+        openList() {
+            this.$router.push({ name: "Menu" })
+        },
         handleLogout() {
             document.cookie = "token=;expires=Thu, 01-Jan-1970 00:00:00 GMT"
             document.cookie = "username=;expires=Thu, 01-Jan-1970 00:00:00 GMT"

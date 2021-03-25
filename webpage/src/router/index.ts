@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, RouteRecordRaw } from 'vue-router'
 import PostEditor from '@/components/PostEditor.vue'
+import PostListActor from '@/components/PostListActor.vue'
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -31,7 +32,13 @@ const routes: Array<RouteRecordRaw> = [
     name: 'NewCorrection',
     component: PostEditor,
     props: route => ({ postid: parseInt(route.params.postid as string), corrid: null })
-  }
+  },
+  {
+    path: '/menu',
+    name: 'Menu',
+    component: PostListActor,
+    // props: route => ({ postid: parseInt(route.params.postid as string), corrid: null })
+  },
 ]
 
 const router = createRouter({

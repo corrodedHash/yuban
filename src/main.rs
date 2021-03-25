@@ -179,6 +179,15 @@ fn newcorr_route_fix(path: PathBuf) -> Option<NamedFile> {
     .ok()
 }
 
+#[rocket::get("/menu", rank = 8)]
+fn menu_route_fix() -> Option<NamedFile> {
+    NamedFile::open(
+        std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/webpage/dist"))
+            .join("index.html"),
+    )
+    .ok()
+}
+
 fn main() {
     let db = db::YubanDatabase::new().expect("Could not open database");
     match db.new_login("me", "secret") {
@@ -187,7 +196,15 @@ fn main() {
             dbg!(err);
         }
     }
-    rocket::ignite()
+    use rocket::config::{Config, Environment};
+
+    let config = Config::build(Environment::Staging)
+        .address("0.0.0.0")
+        .port(8000)
+        .finalize()
+        .unwrap();
+
+    rocket::custom(config)
         .manage(db)
         .mount(
             "/api",
@@ -207,7 +224,8 @@ fn main() {
                 post_route_fix,
                 newpost_route_fix,
                 corr_route_fix,
-                newcorr_route_fix
+                newcorr_route_fix,
+                menu_route_fix
             ],
         )
         .mount(
