@@ -10,34 +10,33 @@ const routes: Array<RouteRecordRaw> = [
     props: true
   },
   {
-    path: '/post/:postid',
+    path: '/r/post/:postid',
     name: 'View',
     component: PostEditor,
     props: route => ({ postid: parseInt(route.params.postid as string), threadid: undefined })
   },
   {
-    path: '/correction/:postid/:corrid',
+    path: '/r/correction/:postid/:corrid',
     name: 'Correction',
     component: PostEditor,
     props: route => ({ postid: parseInt(route.params.postid as string), corrid: parseInt(route.params.corrid as string) })
   },
   {
-    path: '/newpost/:threadid',
+    path: '/r/newpost/:threadid',
     name: 'NewPost',
     component: PostEditor,
     props: route => ({ postid: undefined, threadid: parseInt(route.params.threadid as string) })
   },
   {
-    path: '/newcorrection/:postid',
+    path: '/r/newcorrection/:postid',
     name: 'NewCorrection',
     component: PostEditor,
     props: route => ({ postid: parseInt(route.params.postid as string), corrid: null })
   },
   {
-    path: '/menu',
+    path: '/r/menu',
     name: 'Menu',
     component: PostListActor,
-    // props: route => ({ postid: parseInt(route.params.postid as string), corrid: null })
   },
 ]
 
