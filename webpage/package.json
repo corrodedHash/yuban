@@ -12,6 +12,7 @@
   "main": "index.js",
   "dependencies": {
     "@vue/cli": "^4.5.12",
+    "diff": "^4.0.2",
     "element-plus": "^1.0.2-beta.35",
     "register-service-worker": "^1.7.1",
     "vue": "^3.0.0",

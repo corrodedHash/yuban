@@ -1,10 +1,13 @@
 <template>
   <el-container style="height: 500px; border: 1px solid #eee">
     <el-aside
-      width="200px"
+      width="250px"
       style="background-color: rgb(238, 241, 246); overflow: none"
     >
-      <post-list @select-post="handlePostSwitch" />
+      <post-list
+        @select-post="handlePostSwitch"
+        @select-correction="handleCorrectionSwitch"
+      />
     </el-aside>
 
     <el-container>

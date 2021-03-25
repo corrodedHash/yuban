@@ -17,6 +17,13 @@ export default defineComponent({
             document.cookie = "username=;expires=Thu, 01-Jan-1970 00:00:00 GMT"
             this.$emit('logout')
         },
+        handleCorrectionSwitch(thread_id: number, post_id: number, correction: number | null) {
+            if (correction !== null) {
+                this.$router.push({ name: "Correction", params: { postid: post_id, corrid: correction } })
+            } else {
+                this.$router.push({ name: "NewCorrection", params: { postid: post_id } })
+            }
+        },
         handlePostSwitch(thread_id: number | null, post_id: number | null) {
             if (post_id === null && thread_id === null) {
                 this.$router.push({ path: '/' })

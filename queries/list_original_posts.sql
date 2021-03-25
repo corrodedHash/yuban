@@ -21,7 +21,7 @@ FROM
                 'lang',
                 Originals.langcode,
                 'corrections',
-                Corr.corr_ids
+                Corr.corrsum
             ) AS post
         FROM
             Posts
@@ -32,10 +32,25 @@ FROM
             INNER JOIN (
                 SELECT
                     Originals.post_id AS post_id,
-                    JSON_ARRAYAGG(Corrections.post_id) AS corr_ids
+                    JSON_ARRAYAGG(corr_summary.corrsum) AS corrsum
                 FROM
                     Originals
-                    LEFT JOIN Corrections ON Originals.post_id = Corrections.orig_id
+                    LEFT JOIN (
+                        SELECT
+                            Corrections.orig_id AS orig_id,
+                            JSON_OBJECT(
+                                'id',
+                                Corrections.post_id,
+                                'username',
+                                Users.username,
+                                'postdate',
+                                Posts.postdate
+                            ) AS corrsum
+                        FROM
+                            Corrections
+                            INNER JOIN Posts ON Posts.id = Corrections.post_id
+                            INNER JOIN Users ON Users.id = Posts.userid
+                    ) corr_summary ON Originals.post_id = corr_summary.orig_id
                 GROUP BY
                     Originals.post_id
             ) Corr ON Posts.id = Corr.post_id

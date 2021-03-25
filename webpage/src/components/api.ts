@@ -3,25 +3,30 @@ type XMLCallback = (req: XMLHttpRequest) => void;
 
 export interface ThreadSummary {
     id: number;
-    posttime: string;
-    posts: string;
+    posttime: Date;
+    posts: PostSummary[];
     user: string;
 }
 
 export interface PostSummary {
     id: number,
-    date: string,
+    date: Date,
     ellipsis: string,
     user: string,
     lang: string,
-    corrections: string
+    corrections: CorrectionSummary[] | [null]
+}
 
+export interface CorrectionSummary {
+    id: number,
+    postdate: Date,
+    username: string
 }
 
 export interface Post {
     thread_id: number,
     id: number,
-    posttime: string,
+    posttime: Date,
     langcode: string,
     correction_for: number | null,
     text: string
@@ -40,16 +45,16 @@ export function check_login(username: string, password: string): Promise<boolean
                     resolve(loginreq.response)
                     return;
                 default:
-                    console.log("Unknown status", loginreq.status, loginreq.response)
+                    console.warn("Unknown status", loginreq.status, loginreq.response)
                     reject()
             }
         };
         loginreq.onerror = (ev) => {
-            console.log("Error login", ev)
+            console.warn("Error login", ev)
             reject()
         }
         loginreq.onabort = (ev) => {
-            console.log("Abort login", ev)
+            console.warn("Abort login", ev)
             reject()
         }
         let json_data = JSON.stringify({
@@ -69,8 +74,11 @@ export function check_token(): Promise<boolean> {
                 case 202:
                     resolve(true)
                     return;
+                case 401:
+                    resolve(false)
+                    return;
                 default:
-                    console.log("Unknown status", loginreq.status, loginreq.response)
+                    console.warn("Unknown status", loginreq.status, loginreq.response)
                     reject()
             }
         };
@@ -80,12 +88,12 @@ export function check_token(): Promise<boolean> {
                     resolve(false)
                     return;
                 default:
-                    console.log("Unknown status", loginreq.status, loginreq.response)
+                    console.warn("Unknown status", loginreq.status, loginreq.response)
                     reject()
             }
         }
         loginreq.onabort = (ev) => {
-            console.log("Abort login", ev)
+            console.warn("Abort login", ev)
             reject()
         }
         loginreq.open("GET", `${API_ROOT}/testtoken`, true);
@@ -101,7 +109,21 @@ export function get_posts(): Promise<ThreadSummary[]> {
                 let x = JSON.parse(postreq.responseText) as any[];
                 let threads: ThreadSummary[] = x.map(thread => {
                     thread.posts = JSON.parse(thread.posts)
-                    return thread
+                    let modified_thread = thread as ThreadSummary
+                    modified_thread.posts = modified_thread.posts.map(post => {
+                        if (post.corrections.length === 1 && post.corrections[0] === null) {
+                            post.corrections = []
+                        }
+                        post.corrections = (post.corrections as unknown as CorrectionSummary[]).map(corr => {
+                            corr.postdate = new Date(Date.parse(corr.postdate as unknown as string))
+                            return corr
+                        })
+                        let parsed_time = new Date(Date.parse(post.date as unknown as string))
+                        post.date = parsed_time
+                        return post
+                    })
+                    modified_thread.posttime = new Date(Date.parse(modified_thread.posttime as unknown as string))
+                    return modified_thread
                 })
                 resolve(threads)
             } else {
@@ -119,7 +141,10 @@ export function get_post(post_id: number): Promise<Post> {
         postreq.responseType = "json"
         postreq.onload = (ev) => {
             if (postreq.status === 200) {
-                resolve(postreq.response)
+                let post = postreq.response as Post
+
+                post.posttime = new Date(Date.parse(post.posttime as unknown as string))
+                resolve(post)
             } else {
                 reject()
             }
@@ -159,6 +184,22 @@ export function add_post(post: string, thread_id: number, langcode: string): Pro
             reject()
         }
         postreq.open("PUT", `${API_ROOT}/addpost/${thread_id}/${langcode}`, true);
+        postreq.send(post);
+    })
+}
+export function add_correction(post: string, orig_id: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+        let postreq = new XMLHttpRequest();
+        postreq.onload = () => {
+            resolve()
+        }
+        postreq.onerror = () => {
+            reject()
+        }
+        postreq.onabort = () => {
+            reject()
+        }
+        postreq.open("PUT", `${API_ROOT}/addcorrection/${orig_id}`, true);
         postreq.send(post);
     })
 }

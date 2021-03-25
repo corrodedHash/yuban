@@ -161,6 +161,24 @@ fn newpost_route_fix(path: PathBuf) -> Option<NamedFile> {
     .ok()
 }
 
+#[rocket::get("/correction/<path..>", rank = 8)]
+fn corr_route_fix(path: PathBuf) -> Option<NamedFile> {
+    NamedFile::open(
+        std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/webpage/dist"))
+            .join("index.html"),
+    )
+    .ok()
+}
+
+#[rocket::get("/newcorrection/<path..>", rank = 8)]
+fn newcorr_route_fix(path: PathBuf) -> Option<NamedFile> {
+    NamedFile::open(
+        std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/webpage/dist"))
+            .join("index.html"),
+    )
+    .ok()
+}
+
 fn main() {
     let db = db::YubanDatabase::new().expect("Could not open database");
     match db.new_login("me", "secret") {
@@ -183,7 +201,15 @@ fn main() {
                 new_correction
             ],
         )
-        .mount("/", rocket::routes![post_route_fix, newpost_route_fix])
+        .mount(
+            "/",
+            rocket::routes![
+                post_route_fix,
+                newpost_route_fix,
+                corr_route_fix,
+                newcorr_route_fix
+            ],
+        )
         .mount(
             "/",
             rocket_contrib::serve::StaticFiles::from(concat!(

@@ -7,6 +7,9 @@ export default defineComponent({
         selectPost(thread_id: number | null, post_id: number | null) {
             return true;
         },
+        selectCorrection(thread_id: number, post_id: number, corr_id: number | null) {
+            return true;
+        },
     },
     data() {
         return {
@@ -31,9 +34,14 @@ export default defineComponent({
         },
         handleSelectedPost(thread_index: number, index: PostSummary) {
             if (index !== null) {
-                console.log("Selected: ", index);
                 this.$emit("selectPost", thread_index, index.id);
             }
+        },
+        selectNewCorrection(thread_id: number, post: PostSummary) {
+            this.$emit("selectCorrection", thread_id, post.id, null);
+        },
+        handleSelectedCorrection(thread_index: number, index: PostSummary, corr_index: number) {
+            this.$emit("selectCorrection", thread_index, index.id, corr_index);
         },
         requestPosts() {
             let me = this;

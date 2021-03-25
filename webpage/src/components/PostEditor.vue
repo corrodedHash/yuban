@@ -1,5 +1,10 @@
 <template>
   <div>
+    <post-diff
+      v-if="orig_text !== undefined"
+      :original="orig_text"
+      :correction="text"
+    ></post-diff>
     <textarea class="editor" v-model="text" :disabled="!canEdit"></textarea
     ><br />
     <el-button
@@ -12,7 +17,7 @@
     <select ref="langcode">
       <option value="de">German</option>
       <option value="zh">Chinese</option>
-      </select>
+    </select>
   </div>
 </template>
 
