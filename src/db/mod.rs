@@ -1,4 +1,5 @@
-use crate::{auth::AccessToken, LangCode};
+use crate::auth::AccessToken;
+use crate::routes::LangCode;
 use mysql::{
     params,
     prelude::{FromRow, Queryable},
@@ -131,14 +132,8 @@ pub struct YubanDatabase {
     pool: mysql::Pool,
 }
 impl YubanDatabase {
-    pub fn new() -> Option<Self> {
-        let opts = OptsBuilder::new()
-            .ip_or_hostname(Some("127.0.0.1"))
-            .tcp_port(3306)
-            .user(Some("yubanmanager"))
-            .db_name(Some("yuban"))
-            .pass(Some("PajqMDXIloNcwuxG27udp3gy4EBi"));
-        let pool = match mysql::Pool::new(opts) {
+    pub fn new(db_opts: OptsBuilder) -> Option<Self> {
+        let pool = match mysql::Pool::new(db_opts) {
             Ok(pool) => pool,
             Err(err) => {
                 dbg!(err);
@@ -322,6 +317,7 @@ impl YubanDatabase {
         true
     }
 
+    #[allow(dead_code)]
     pub fn new_login(&self, name: &str, pass: &str) -> Result<(), ()> {
         let mut conn = self.get_conn()?;
 
