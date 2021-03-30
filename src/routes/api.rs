@@ -40,7 +40,7 @@ impl<'r> FromParam<'r> for LangCode {
     }
 }
 
-#[rocket::post("/logindata", data = "<data>")]
+#[rocket::post("/login", data = "<data>")]
 fn login_post(
     data: rocket_contrib::json::Json<LoginData>,
     mut cookies: Cookies,
@@ -51,26 +51,32 @@ fn login_post(
             Ok(t) => t,
             Err(_) => return Err(Status::BadGateway),
         };
-        let str_token = base64::encode(token.as_ref());
+        let str_token = base64::encode_config(token.as_ref(), base64::URL_SAFE);
+        assert_eq!(str_token.len(), 44);
         cookies.add(
-            Cookie::build("token", str_token)
+            Cookie::build("token", format!("{}{}", data.username, str_token))
                 .secure(true)
                 .same_site(rocket::http::SameSite::Strict)
                 .permanent()
                 .path("/")
-                .finish(),
-        );
-        cookies.add(
-            Cookie::build("username", data.username.clone())
-                .secure(true)
-                .same_site(rocket::http::SameSite::Strict)
-                .permanent()
-                .path("/")
+                .http_only(true)
                 .finish(),
         );
         return Ok(rocket::response::content::Json("true".to_owned()));
     }
     Ok(rocket::response::content::Json("false".to_owned()))
+}
+
+#[rocket::post("/logout")]
+fn logout_post(
+    user: AuthorizedUser,
+    mut cookies: Cookies,
+    db: State<db::YubanDatabase>,
+) -> Result<rocket::response::content::Json<String>, Status> {
+    db.remove_token(user.userid, user.token)
+        .map_err(|_| Status::BadGateway)?;
+    cookies.remove(Cookie::named("token"));
+    Ok(rocket::response::content::Json("true".to_owned()))
 }
 
 #[rocket::get("/testtoken")]
@@ -159,9 +165,11 @@ fn single_post(
     let json_post = serde_json::to_string(&post).map_err(|_| Status::InternalServerError)?;
     Ok(rocket::response::content::Json(json_post))
 }
+
 pub fn get_api_routes() -> impl Into<Vec<rocket::Route>> {
     rocket::routes![
         login_post,
+        logout_post,
         article_posts,
         test_token,
         single_post,

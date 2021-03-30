@@ -1,50 +1,35 @@
 use rocket::Route;
 use std::path::PathBuf;
 
+use crate::StaticFilePath;
 use rocket::response::NamedFile;
-
-#[rocket::get("/post/<path..>", rank = 8)]
-fn post_route(path: PathBuf) -> Option<NamedFile> {
-    NamedFile::open(
-        std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/webpage/dist"))
-            .join("index.html"),
-    )
-    .ok()
+#[rocket::get("/post/<_path..>", rank = 8)]
+fn post_route(_path: PathBuf, static_path: rocket::State<StaticFilePath>) -> Option<NamedFile> {
+    let path = static_path.0.clone();
+    NamedFile::open(path.join("index.html")).ok()
 }
-#[rocket::get("/newpost/<path..>", rank = 8)]
-fn newpost_route(path: PathBuf) -> Option<NamedFile> {
-    NamedFile::open(
-        std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/webpage/dist"))
-            .join("index.html"),
-    )
-    .ok()
+#[rocket::get("/newpost/<_path..>", rank = 8)]
+fn newpost_route(_path: PathBuf, static_path: rocket::State<StaticFilePath>) -> Option<NamedFile> {
+    let path = static_path.0.clone();
+    NamedFile::open(path.join("index.html")).ok()
 }
 
-#[rocket::get("/correction/<path..>", rank = 8)]
-fn corr_route(path: PathBuf) -> Option<NamedFile> {
-    NamedFile::open(
-        std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/webpage/dist"))
-            .join("index.html"),
-    )
-    .ok()
+#[rocket::get("/correction/<_path..>", rank = 8)]
+fn corr_route(_path: PathBuf, static_path: rocket::State<StaticFilePath>) -> Option<NamedFile> {
+    let path = static_path.0.clone();
+    NamedFile::open(path.join("index.html")).ok()
 }
 
-#[rocket::get("/newcorrection/<path..>", rank = 8)]
-fn newcorr_route(path: PathBuf) -> Option<NamedFile> {
-    NamedFile::open(
-        std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/webpage/dist"))
-            .join("index.html"),
-    )
-    .ok()
+#[rocket::get("/newcorrection/<_path..>", rank = 8)]
+fn newcorr_route(_path: PathBuf, static_path: rocket::State<StaticFilePath>) -> Option<NamedFile> {
+    let path = static_path.0.clone();
+    NamedFile::open(path.join("index.html")).ok()
 }
 
 #[rocket::get("/menu", rank = 8)]
-fn menu_route() -> Option<NamedFile> {
-    NamedFile::open(
-        std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/webpage/dist"))
-            .join("index.html"),
-    )
-    .ok()
+fn menu_route(static_path: rocket::State<StaticFilePath>) -> Option<NamedFile> {
+    let path = static_path.0.clone();
+    NamedFile::open(path.join("index.html")).ok()
 }
 
 pub fn get_fix_routes() -> impl Into<Vec<Route>> {

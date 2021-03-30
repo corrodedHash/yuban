@@ -33,9 +33,13 @@ impl AsRef<[u8; 32]> for AccessToken {
     }
 }
 
+#[derive(Debug)]
 pub struct AuthorizedUser {
+    pub userid: u64,
     pub username: String,
+    pub token: AccessToken,
 }
+
 impl<'a, 'r> FromRequest<'a, 'r> for AuthorizedUser {
     type Error = ();
 
@@ -51,16 +55,22 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorizedUser {
             };
             let cookies = request.cookies();
             let token_cookie = cookies.get("token").ok_or(Status::Unauthorized)?.value();
-            let username_cookie = cookies.get("username").ok_or(Status::Unauthorized)?.value();
-            let decoded_token_vec = base64::decode(token_cookie).map_err(|_| Status::BadRequest)?;
+            let (username, token): (&str, &str) = (
+                &token_cookie[..token_cookie.len() - 44],
+                &token_cookie[token_cookie.len() - 44..],
+            );
+
+            let decoded_token_vec = base64::decode(token).map_err(|_| Status::BadRequest)?;
             let decoded_token = decoded_token_vec
                 .try_into()
                 .map_err(|_| rocket::http::Status::BadRequest)?;
 
-            let token_check = db.check_token(username_cookie, &decoded_token);
-            if token_check {
+            let token_check = db.check_token(username, &decoded_token);
+            if let Ok(userid) = token_check {
                 Ok(AuthorizedUser {
-                    username: username_cookie.to_owned(),
+                    userid,
+                    username: username.to_owned(),
+                    token: decoded_token,
                 })
             } else {
                 Err(Status::Unauthorized)

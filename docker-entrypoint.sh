@@ -1,0 +1,1 @@
+yuban ---mysql-host ${YUBAN_MYSQL_HOST} --bind-address 0.0.0.0 --mysql-user ${YUBAN_MYSQL_USER}

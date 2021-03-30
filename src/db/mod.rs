@@ -6,7 +6,6 @@ use mysql::{
     OptsBuilder,
 };
 use rand::RngCore;
-use sha2::{digest::FixedOutput, Digest, Sha256};
 
 mod transactional;
 
@@ -106,20 +105,6 @@ fn serialize_date<S: serde::Serializer>(x: &mysql::Value, s: S) -> Result<S::Ok,
         dbg!(x);
         Err(S::Error::custom("Value not a date"))
     }
-}
-
-fn salted_pw(pass: &str, salt: &[u8]) -> [u8; 32] {
-    let mut h = Sha256::default();
-    h.update(pass.as_bytes());
-    h.update(salt);
-    h.finalize_fixed().into()
-}
-
-fn compare_slice<T: PartialEq>(a: &[T], b: &[T]) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    a.iter().zip(b.iter()).all(|(x, y)| x == y)
 }
 
 fn generate_salt() -> Vec<u8> {
@@ -262,7 +247,7 @@ impl YubanDatabase {
         })
     }
 
-    pub fn add_token(&self, userid: usize) -> Result<AccessToken, ()> {
+    pub fn add_token(&self, userid: u64) -> Result<AccessToken, ()> {
         let mut conn = self.get_conn()?;
         const STATEMENT_STRING: &str = concat!(
             "INSERT INTO Tokens (userid, token, issuedate) ",
@@ -285,39 +270,53 @@ impl YubanDatabase {
 
         Ok(token)
     }
+    pub fn remove_token(&self, userid: u64, token: AccessToken) -> Result<(), ()> {
+        let mut conn = self.get_conn()?;
+        const STATEMENT_STRING: &str =
+            concat!("DELETE FROM Tokens WHERE userid = :userid AND token = :token",);
 
-    pub fn check_token(&self, username: &str, token: &AccessToken) -> bool {
-        let mut conn = match self.get_conn() {
-            Ok(conn) => conn,
-            Err(_) => return false,
-        };
+        let statement = conn.prep(STATEMENT_STRING).map_err(|err| {
+            dbg!(err);
+        })?;
+        conn.exec_drop(
+            statement,
+            params! {
+                "userid" => userid,
+                "token" => token.as_ref()
+            },
+        )
+        .map_err(|_| ())?;
+
+        Ok(())
+    }
+
+    pub fn check_token(&self, username: &str, token: &AccessToken) -> Result<u64, ()> {
+        let mut conn = self.get_conn().map_err(|err| {
+            dbg!(err);
+        })?;
 
         let statement = conn
             .prep(concat!(
-                "SELECT 1 FROM Users INNER JOIN Tokens ",
+                "SELECT Users.id FROM Users INNER JOIN Tokens ",
                 "ON Users.id=Tokens.userid ",
                 "WHERE Users.username = :username AND Tokens.token = :token"
             ))
             .map_err(|err| dbg!(err));
-        let statement = match statement {
-            Ok(x) => x,
-            Err(_) => return true,
-        };
-        let _query_result: Option<usize> = match conn.exec_first(
-            statement,
-            params! {"username" => username, "token" => token.as_ref() },
-        ) {
-            Ok(Some(x)) => x,
-            Ok(None) => return false,
-            Err(err) => {
+        let statement = statement.map_err(|err| {
+            dbg!(err);
+        })?;
+        let userid: u64 = conn
+            .exec_first(
+                statement,
+                params! {"username" => username, "token" => token.as_ref() },
+            )
+            .map_err(|err| {
                 dbg!(err);
-                return false;
-            }
-        };
-        true
+            })?
+            .ok_or(())?;
+        Ok(userid)
     }
 
-    #[allow(dead_code)]
     pub fn new_login(&self, name: &str, pass: &str) -> Result<(), ()> {
         let mut conn = self.get_conn()?;
 
@@ -325,41 +324,65 @@ impl YubanDatabase {
 
         let statement = conn
             .prep(concat!(
-                "INSERT INTO Users (username, passwordHash, salt) ",
-                "VALUES (:username, :pwh, :salt)"
+                "INSERT INTO Users (username, passwordHash) ",
+                "VALUES (:username, :pwh)"
             ))
             .map_err(|e| {
                 dbg!(e);
             })?;
 
         let salt = generate_salt();
-        let pwhash = salted_pw(pass, &salt);
+        let pwhash = argon2::hash_encoded(pass.as_bytes(), &salt, &argon2::Config::default())
+            .map_err(|_| ())?;
         let params = params! {
             "username" => &lower_name,
             "pwh" => pwhash,
-            "salt" => salt
         };
         conn.exec_drop(statement, params).map_err(|_| ())
     }
 
-    pub fn check_login(&self, name: &str, pass: &str) -> Result<usize, ()> {
+
+    pub fn remove_login(&self, name: &str) -> Result<(), ()> {
+        let mut conn = self.get_conn()?;
+
+        let lower_name = name.to_lowercase();
+
+        let statement = conn
+            .prep(concat!(
+                "DELETE FROM Users ",
+                "WHERE username = :username"
+            ))
+            .map_err(|e| {
+                dbg!(e);
+            })?;
+
+        let params = params! {
+            "username" => &lower_name,
+        };
+        conn.exec_drop(statement, params).map_err(|_| ())
+    }
+
+    pub fn check_login(&self, name: &str, pass: &str) -> Result<u64, ()> {
         let mut conn = self.get_conn()?;
         let statement = conn
-            .prep("SELECT id, passwordHash, salt FROM Users WHERE username = :username")
+            .prep("SELECT id, passwordHash FROM Users WHERE username = :username")
             .map_err(|err| {
                 dbg!(err);
             })?;
 
-        let query_result: (usize, Vec<u8>, Vec<u8>) = conn
+        let query_result: (u64, String) = conn
             .exec_first(statement, params! {"username" => name})
             .map_err(|err| {
                 dbg!(err);
             })?
             .ok_or(())?;
 
-        let (id, pwhash, salt) = query_result;
-        let hash_result = salted_pw(pass, &salt);
-        let hash_equal = compare_slice(&hash_result, &pwhash);
-        hash_equal.then_some(id).ok_or(())
+        let (id, pwhash) = query_result;
+        argon2::verify_encoded(&pwhash, pass.as_bytes())
+            .map_err(|_| {
+                dbg!("argon2 errored");
+            })?
+            .then_some(id)
+            .ok_or(())
     }
 }
