@@ -47,14 +47,27 @@ fn add_user(
     )
 }
 
+#[rocket::get("/users")]
+fn list_users(
+    _user: AuthorizedAdmin,
+    db: State<db::YubanDatabase>,
+) -> rocket_contrib::json::Json<Vec<String>> {
+    rocket_contrib::json::Json(db.list_users().ok().unwrap_or_default())
+}
+
+#[derive(serde::Deserialize)]
+struct Username {
+    pub username: String,
+}
+
 #[rocket::delete("/login", data = "<data>")]
 fn remove_user(
     _user: AuthorizedAdmin,
-    data: rocket_contrib::json::Json<String>,
+    data: rocket_contrib::json::Json<Username>,
     db: State<db::YubanDatabase>,
 ) -> rocket::response::content::Json<String> {
     rocket::response::content::Json(
-        db.remove_login(&data)
+        db.remove_login(&data.username)
             .map(|_| "true")
             .ok()
             .unwrap_or("false")
@@ -63,5 +76,5 @@ fn remove_user(
 }
 
 pub fn get_admin_routes() -> impl Into<Vec<Route>> {
-    rocket::routes![add_user, remove_user]
+    rocket::routes![add_user, remove_user, list_users]
 }

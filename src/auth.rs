@@ -60,7 +60,11 @@ impl<'a, 'r> FromRequest<'a, 'r> for AuthorizedUser {
                 &token_cookie[token_cookie.len() - 44..],
             );
 
-            let decoded_token_vec = base64::decode(token).map_err(|_| Status::BadRequest)?;
+            let decoded_token_vec =
+                base64::decode_config(token, base64::URL_SAFE).map_err(|err| {
+                    dbg!(err);
+                    Status::BadRequest
+                })?;
             let decoded_token = decoded_token_vec
                 .try_into()
                 .map_err(|_| rocket::http::Status::BadRequest)?;

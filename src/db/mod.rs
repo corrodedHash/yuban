@@ -222,6 +222,17 @@ impl YubanDatabase {
         Ok(postid)
     }
 
+    pub fn list_users(&self) -> Result<Vec<String>, ()> {
+        const STATEMENT_STRING: &str = "SELECT username FROM Users";
+        let mut conn = self.get_conn()?;
+        let statement = conn.prep(STATEMENT_STRING).map_err(|err| {
+            dbg!(err);
+        })?;
+        conn.exec(statement, ()).map_err(|err| {
+            dbg!(err);
+        })
+    }
+
     pub fn get_post(&self, postid: usize) -> Result<Post, ()> {
         const STATEMENT_STRING: &str =
             include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/queries/get_post.sql"));
@@ -341,17 +352,13 @@ impl YubanDatabase {
         conn.exec_drop(statement, params).map_err(|_| ())
     }
 
-
     pub fn remove_login(&self, name: &str) -> Result<(), ()> {
         let mut conn = self.get_conn()?;
 
         let lower_name = name.to_lowercase();
 
         let statement = conn
-            .prep(concat!(
-                "DELETE FROM Users ",
-                "WHERE username = :username"
-            ))
+            .prep(concat!("DELETE FROM Users ", "WHERE username = :username"))
             .map_err(|e| {
                 dbg!(e);
             })?;

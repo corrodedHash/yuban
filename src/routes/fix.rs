@@ -31,6 +31,11 @@ fn menu_route(static_path: rocket::State<StaticFilePath>) -> Option<NamedFile> {
     let path = static_path.0.clone();
     NamedFile::open(path.join("index.html")).ok()
 }
+#[rocket::get("/admin", rank = 8)]
+fn admin_route(static_path: rocket::State<StaticFilePath>) -> Option<NamedFile> {
+    let path = static_path.0.clone();
+    NamedFile::open(path.join("index.html")).ok()
+}
 
 pub fn get_fix_routes() -> impl Into<Vec<Route>> {
     rocket::routes![
@@ -38,6 +43,7 @@ pub fn get_fix_routes() -> impl Into<Vec<Route>> {
         newpost_route,
         corr_route,
         newcorr_route,
-        menu_route
+        menu_route,
+        admin_route,
     ]
 }
