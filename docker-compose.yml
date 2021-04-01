@@ -1,0 +1,39 @@
+version: "3.8"
+services:
+  yuban-db:
+    image: yuban-db
+    environment:
+      - MYSQL_DATABASE=yuban
+      - MYSQL_USER=yubanmanager
+      - MYSQL_PASSWORD
+      - MYSQL_ROOT_PASSWORD
+    networks:
+      - yuban
+    volumes:
+      - data-volume:/var/lib/mysql
+    restart: "unless-stopped"
+
+  yuban-server:
+    image: yuban-server
+    networks:
+      - yuban
+    environment:
+      - YUBAN_MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - YUBAN_MYSQL_USER=yubanmanager
+      - YUBAN_MYSQL_HOST=yuban-db
+    restart: "unless-stopped"
+
+  yuban-client:
+    image: yuban-client
+    networks:
+      - yuban
+      - nginx-proxy
+    restart: "unless-stopped"
+
+networks:
+  yuban:
+  nginx-proxy:
+    external: true
+
+volumes:
+  data-volume:

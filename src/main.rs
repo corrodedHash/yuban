@@ -4,7 +4,6 @@
 mod auth;
 mod db;
 mod routes;
-
 use std::path::PathBuf;
 
 use rocket::Rocket;

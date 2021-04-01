@@ -113,6 +113,14 @@ fn generate_salt() -> Vec<u8> {
     salt_vec.to_vec()
 }
 
+const QUERY_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/queries/");
+
+macro_rules! load_query {
+    ($filename: tt) => {
+        include_str!(format!("{}{}", QUERY_DIR, $filename))
+    };
+}
+
 pub struct YubanDatabase {
     pool: mysql::Pool,
 }
@@ -281,6 +289,7 @@ impl YubanDatabase {
 
         Ok(token)
     }
+
     pub fn remove_token(&self, userid: u64, token: AccessToken) -> Result<(), ()> {
         let mut conn = self.get_conn()?;
         const STATEMENT_STRING: &str =
