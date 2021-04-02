@@ -1,6 +1,6 @@
 SELECT
     Threads.id,
-    Threads.creator,
+    Users.username,
     Threads.opened_on,
     JSON_ARRAYAGG(Originals.langcode),
     JSON_ARRAYAGG(corr_counts.counts)
@@ -17,6 +17,7 @@ FROM
         GROUP BY
             Corrections.orig_id
     ) corr_counts ON corr_counts.orig_id = Originals.post_id
+    JOIN Users ON Users.id = Threads.creator
 GROUP BY
     Threads.id,
     Threads.creator,

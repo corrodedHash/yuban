@@ -1,7 +1,7 @@
 
 use mysql::{params, prelude::Queryable, Transaction};
 
-pub(super) fn get_user_id(username: &str, transaction: &mut Transaction) -> Result<u64, ()> {
+pub(crate) fn get_user_id(username: &str, transaction: &mut Transaction) -> Result<u64, ()> {
     const STATEMENT_STRING_ID: &str = "SELECT id FROM Users WHERE username = :username";
 
     let statement = transaction.prep(STATEMENT_STRING_ID).map_err(|err| {
@@ -15,7 +15,7 @@ pub(super) fn get_user_id(username: &str, transaction: &mut Transaction) -> Resu
         })?
         .ok_or(())
 }
-pub(super) fn post(user_id: u64, post: &str, transaction: &mut Transaction) -> Result<u64, ()> {
+pub(crate) fn post(user_id: u64, post: &str, transaction: &mut Transaction) -> Result<u64, ()> {
     const STATEMENT_STRING_INSERT: &str = concat!(
         "INSERT INTO Posts (userid, postdate, post) ",
         "VALUES (:userid, CURRENT_TIMESTAMP, :post)",
@@ -31,7 +31,7 @@ pub(super) fn post(user_id: u64, post: &str, transaction: &mut Transaction) -> R
     Ok(postid)
 }
 
-pub(super) fn link_orig(
+pub(crate) fn link_orig(
     thread_id: u64,
     post_id: u64,
     langcode: &str,

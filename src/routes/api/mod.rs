@@ -28,7 +28,7 @@ pub fn get_api_routes() -> impl Into<Vec<rocket::Route>> {
         query::list_threads,
         query::list_posts,
         query::single_post,
-        modify::new_post,
+        modify::new_thread,
         modify::new_translation,
         modify::new_correction
     ]
