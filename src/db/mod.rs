@@ -59,6 +59,20 @@ macro_rules! load_query {
     };
 }
 
+pub(crate) trait QueryableAndLastInsert: Queryable {
+    fn last_insert_id(&self) -> u64;
+}
+impl QueryableAndLastInsert for mysql::PooledConn {
+    fn last_insert_id(&self) -> u64 {
+        self.as_ref().last_insert_id()
+    }
+}
+impl<'a> QueryableAndLastInsert for mysql::Transaction<'a> {
+    fn last_insert_id(&self) -> u64 {
+        self.last_insert_id().unwrap()
+    }
+}
+
 pub struct YubanDatabase {
     pool: mysql::Pool,
 }
@@ -102,7 +116,6 @@ impl YubanDatabase {
         })?;
         Ok(post_id)
     }
-
 
     pub fn add_correction(&self, username: &str, post: &str, orig_id: u64) -> Result<u64, ()> {
         const STATEMENT_STRING_ORIG_LINK: &str = concat!(
