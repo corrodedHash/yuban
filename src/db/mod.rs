@@ -6,6 +6,7 @@ use mysql::{
 };
 use rand::RngCore;
 
+pub mod permissions;
 pub mod transactional;
 
 #[derive(serde::Serialize, Debug, Clone)]
@@ -90,60 +91,6 @@ impl YubanDatabase {
 
     pub fn get_conn(&self) -> Result<mysql::PooledConn, ()> {
         self.pool.try_get_conn(500).map_err(|_| ())
-    }
-
-    pub fn add_post(
-        &self,
-        username: &str,
-        post: &str,
-        thread_id: u64,
-        langcode: &str,
-    ) -> Result<u64, ()> {
-        let mut conn = self.get_conn()?;
-
-        let mut transaction = conn
-            .start_transaction(mysql::TxOpts::default())
-            .map_err(|err| {
-                dbg!(err);
-            })?;
-        let user_id = transactional::get_user_id(username, &mut transaction)?;
-        let post_id = transactional::post(user_id, post, &mut transaction)?;
-        transactional::link_orig(thread_id, post_id, langcode, &mut transaction)
-            .map(|_| post_id)?;
-
-        transaction.commit().map_err(|err| {
-            dbg!(err);
-        })?;
-        Ok(post_id)
-    }
-
-    pub fn add_correction(&self, username: &str, post: &str, orig_id: u64) -> Result<u64, ()> {
-        const STATEMENT_STRING_ORIG_LINK: &str = concat!(
-            "INSERT INTO Corrections (orig_id, post_id) ",
-            "VALUES (:orig_id, :post_id)"
-        );
-        let mut conn = self.get_conn()?;
-        let mut transaction = conn
-            .start_transaction(mysql::TxOpts::default())
-            .map_err(|err| {
-                dbg!(err);
-            })?;
-        let user_id = transactional::get_user_id(username, &mut transaction)?;
-        let postid = transactional::post(user_id, post, &mut transaction)?;
-
-        let statement = transaction
-            .prep(STATEMENT_STRING_ORIG_LINK)
-            .map_err(|err| {
-                dbg!(err);
-            })?;
-        let params = params! {"orig_id" => orig_id, "post_id" => postid};
-        transaction.exec_drop(statement, params).map_err(|err| {
-            dbg!(err);
-        })?;
-        transaction.commit().map_err(|err| {
-            dbg!(err);
-        })?;
-        Ok(postid)
     }
 
     pub fn list_users(&self) -> Result<Vec<String>, ()> {

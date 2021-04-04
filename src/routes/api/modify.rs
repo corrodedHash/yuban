@@ -5,7 +5,7 @@ use rocket::{http::Status, State};
 
 use crate::{auth::AuthorizedUser, db};
 
-use super::LangCode;
+use super::{super::InternalDebugFailure, LangCode};
 
 pub(super) struct BoundedPost {
     post: String,
@@ -29,34 +29,7 @@ impl rocket::data::FromDataSimple for BoundedPost {
     }
 }
 
-#[derive(Debug, Clone)]
-pub(super) struct InternalDebugFailure(Status);
-
-impl From<Status> for InternalDebugFailure {
-    fn from(s: Status) -> Self {
-        Self(s)
-    }
-}
-
-impl From<()> for InternalDebugFailure {
-    fn from(_: ()) -> Self {
-        Self(Status::InternalServerError)
-    }
-}
-impl From<mysql::Error> for InternalDebugFailure {
-    fn from(err: mysql::Error) -> Self {
-        dbg!(err);
-        Self(Status::InternalServerError)
-    }
-}
-
-impl<'r> rocket::response::Responder<'r> for InternalDebugFailure {
-    fn respond_to(self, request: &rocket::Request) -> rocket::response::Result<'r> {
-        self.0.respond_to(request)
-    }
-}
-
-#[rocket::put("/newpost/<group_id>/<langcode>", data = "<data>")]
+#[rocket::put("/addthread/<group_id>/<langcode>", data = "<data>")]
 pub(super) fn new_thread(
     user: AuthorizedUser,
     langcode: LangCode,
@@ -69,6 +42,12 @@ pub(super) fn new_thread(
         "VALUES (:owner_id, :group_id, CURRENT_TIMESTAMP) "
     );
     let mut conn = db.get_conn()?;
+
+    let user_permission = crate::db::permissions::add_thread(user.userid, group_id, &mut conn)?;
+    if !user_permission {
+        return Err(Status::Unauthorized.into());
+    }
+
     let mut transaction = conn.start_transaction(mysql::TxOpts::default())?;
     let user_id = crate::db::transactional::get_user_id(&user.username, &mut transaction)?;
 
@@ -84,11 +63,7 @@ pub(super) fn new_thread(
     Ok(serde_json::to_string(&serde_json::json!({
         "thread_id": thread_id,
         "post_id": post_id
-    }))
-    .map_err(|err| {
-        dbg!(err);
-        Status::BadGateway
-    })?)
+    }))?)
 }
 
 #[rocket::put("/addpost/<thread_id>/<langcode>", data = "<data>")]
@@ -98,10 +73,26 @@ pub(super) fn new_translation(
     thread_id: u64,
     langcode: LangCode,
     db: State<db::YubanDatabase>,
-) -> Result<String, Status> {
-    db.add_post(&user.username, &data.post, thread_id, &langcode.0)
-        .map_err(|_| Status::InternalServerError)
-        .map(|x| x.to_string())
+) -> Result<String, InternalDebugFailure> {
+    let mut conn = db.get_conn()?;
+
+    let user_permission =
+        crate::db::permissions::add_translation(user.userid, thread_id, &mut conn)?;
+    if !user_permission {
+        return Err(Status::Unauthorized.into());
+    }
+
+    let mut transaction = conn
+        .start_transaction(mysql::TxOpts::default())
+        .map_err(|err| {
+            dbg!(err);
+        })?;
+    let post_id = crate::db::transactional::post(user.userid, &data.post, &mut transaction)?;
+    crate::db::transactional::link_orig(thread_id, post_id, &langcode.0, &mut transaction)
+        .map(|_| post_id)?;
+
+    transaction.commit()?;
+    return Ok(post_id.to_string());
 }
 
 #[rocket::put("/addcorrection/<origpostid>", data = "<data>")]
@@ -110,8 +101,25 @@ pub(super) fn new_correction(
     data: BoundedPost,
     origpostid: u64,
     db: State<db::YubanDatabase>,
-) -> Result<String, Status> {
-    db.add_correction(&user.username, &data.post, origpostid)
-        .map_err(|_| Status::InternalServerError)
-        .map(|x| x.to_string())
+) -> Result<String, InternalDebugFailure> {
+    const STATEMENT_STRING_ORIG_LINK: &str = concat!(
+        "INSERT INTO Corrections (orig_id, post_id) ",
+        "VALUES (:orig_id, :post_id)"
+    );
+    let mut conn = db.get_conn()?;
+
+    let user_permission =
+        crate::db::permissions::add_correction(user.userid, origpostid, &mut conn)?;
+    if !user_permission {
+        return Err(Status::Unauthorized.into());
+    }
+
+    let mut transaction = conn.start_transaction(mysql::TxOpts::default())?;
+    let postid = crate::db::transactional::post(user.userid, &data.post, &mut transaction)?;
+
+    let statement = transaction.prep(STATEMENT_STRING_ORIG_LINK)?;
+    let params = params! {"orig_id" => origpostid, "post_id" => postid};
+    transaction.exec_drop(statement, params)?;
+    transaction.commit()?;
+    Ok(postid.to_string())
 }

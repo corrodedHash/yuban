@@ -7,6 +7,7 @@ use crate::{
     load_query,
 };
 
+use super::super::InternalDebugFailure;
 use super::LangCode;
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -81,26 +82,21 @@ impl mysql::prelude::FromRow for ThreadSummary {
 }
 
 #[rocket::get("/summary_group/<group_id>")]
-pub fn list_threads(
-    _user: AuthorizedUser,
+pub(super) fn list_threads(
+    user: AuthorizedUser,
     group_id: u64,
     db: State<YubanDatabase>,
-) -> Result<rocket::response::content::Json<String>, Status> {
-    let mut conn = db.get_conn().map_err(|err| {
-        dbg!(err);
-        Status::BadGateway
-    })?;
-    let statement = conn.prep(load_query!("list_threads.sql")).map_err(|err| {
-        dbg!(err);
-        Status::BadGateway
-    })?;
+) -> Result<rocket::response::content::Json<String>, InternalDebugFailure> {
+    let mut conn = db.get_conn()?;
+
+    let user_permission = crate::db::permissions::view_group(user.userid, group_id, &mut conn)?;
+    if !user_permission {
+        return Err(Status::Unauthorized.into());
+    }
+    let statement = conn.prep(load_query!("list_threads.sql"))?;
     let group: ThreadSummary = conn
-        .exec_first(statement, params! {"groupid" => group_id})
-        .map_err(|err| {
-            dbg!(err);
-        })
-        .and_then(|p| p.ok_or(()))
-        .map_err(|_| Status::InternalServerError)?;
+        .exec_first(statement, params! {"groupid" => group_id})?
+        .ok_or(())?;
     let json_post = serde_json::to_string(&group).map_err(|_| Status::InternalServerError)?;
     Ok(rocket::response::content::Json(json_post))
 }
@@ -129,27 +125,23 @@ impl mysql::prelude::FromRow for PostSummary {
 }
 
 #[rocket::get("/summary_thread/<thread_id>")]
-pub fn list_posts(
-    _user: AuthorizedUser,
+pub(super) fn list_posts(
+    user: AuthorizedUser,
     thread_id: u64,
     db: State<YubanDatabase>,
-) -> Result<rocket::response::content::Json<String>, Status> {
-    let mut conn = db.get_conn().map_err(|err| {
-        dbg!(err);
-        Status::BadGateway
-    })?;
-    let statement = conn.prep(load_query!("list_posts.sql")).map_err(|err| {
-        dbg!(err);
-        Status::BadGateway
-    })?;
+) -> Result<rocket::response::content::Json<String>, InternalDebugFailure> {
+    let mut conn = db.get_conn()?;
+
+    let user_permission = crate::db::permissions::view_thread(user.userid, thread_id, &mut conn)?;
+    if !user_permission {
+        return Err(Status::Unauthorized.into());
+    }
+
+    let statement = conn.prep(load_query!("list_posts.sql"))?;
     let group: PostSummary = conn
-        .exec_first(statement, params! {"thread_id" => thread_id})
-        .map_err(|err| {
-            dbg!(err);
-        })
-        .and_then(|p| p.ok_or(()))
-        .map_err(|_| Status::InternalServerError)?;
-    let json_post = serde_json::to_string(&group).map_err(|_| Status::InternalServerError)?;
+        .exec_first(statement, params! {"thread_id" => thread_id})?
+        .ok_or(())?;
+    let json_post = serde_json::to_string(&group)?;
     Ok(rocket::response::content::Json(json_post))
 }
 
@@ -183,27 +175,23 @@ impl mysql::prelude::FromRow for Post {
     }
 }
 
-#[rocket::get("/post/<id>")]
-pub fn single_post(
-    id: usize,
-    _user: AuthorizedUser,
+#[rocket::get("/post/<post_id>")]
+pub(super) fn single_post(
+    post_id: u64,
+    user: AuthorizedUser,
     db: State<YubanDatabase>,
-) -> Result<rocket::response::content::Json<String>, Status> {
-    let mut conn = db.get_conn().map_err(|err| {
-        dbg!(err);
-        Status::BadGateway
-    })?;
-    let statement = conn.prep(load_query!("get_post.sql")).map_err(|err| {
-        dbg!(err);
-        Status::BadGateway
-    })?;
+) -> Result<rocket::response::content::Json<String>, InternalDebugFailure> {
+    let mut conn = db.get_conn()?;
+
+    let user_permission = crate::db::permissions::view_post(user.userid, post_id, &mut conn)?;
+    if !user_permission {
+        return Err(Status::Unauthorized.into());
+    }
+
+    let statement = conn.prep(load_query!("get_post.sql"))?;
     let post: Post = conn
-        .exec_first(statement, params! {"postid" => id})
-        .map_err(|err| {
-            dbg!(err);
-        })
-        .and_then(|p| p.ok_or(()))
-        .map_err(|_| Status::InternalServerError)?;
-    let json_post = serde_json::to_string(&post).map_err(|_| Status::InternalServerError)?;
+        .exec_first(statement, params! {"postid" => post_id})?
+        .ok_or(())?;
+    let json_post = serde_json::to_string(&post)?;
     Ok(rocket::response::content::Json(json_post))
 }
