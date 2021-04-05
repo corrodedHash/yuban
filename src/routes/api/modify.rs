@@ -38,7 +38,7 @@ pub(super) fn new_thread(
     db: State<db::YubanDatabase>,
 ) -> Result<String, InternalDebugFailure> {
     const STATEMENT_STRING: &str = concat!(
-        "INSERT INTO Threads (creator, group, opened_on) ",
+        "INSERT INTO Threads (creator, groupid, opened_on) ",
         "VALUES (:owner_id, :group_id, CURRENT_TIMESTAMP) "
     );
     let mut conn = db.get_conn()?;

@@ -2,7 +2,7 @@ SELECT
     1
 FROM
     GroupMembership
-    JOIN Threads ON Threads.group = GroupMembership.groupid
+    JOIN Threads ON Threads.groupid = GroupMembership.groupid
     JOIN (
         (
             SELECT

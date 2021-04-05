@@ -23,4 +23,4 @@ GROUP BY
     Threads.creator,
     Threads.opened_on
 WHERE
-    Threads.group := groupid
+    Threads.groupid = :groupid

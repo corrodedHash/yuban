@@ -16,6 +16,22 @@ pub(crate) fn get_user_id<Q: Queryable>(username: &str, transaction: &mut Q) -> 
         })?
         .ok_or(())
 }
+
+pub(crate) fn get_group_id<Q: Queryable>(groupname: &str, transaction: &mut Q) -> Result<u64, ()> {
+    const STATEMENT_STRING_ID: &str = "SELECT id FROM Groups WHERE groupname = :groupname";
+
+    let statement = transaction.prep(STATEMENT_STRING_ID).map_err(|err| {
+        dbg!(err);
+    })?;
+    let params = params! {"groupname" => groupname};
+    transaction
+        .exec_first(statement, params)
+        .map_err(|err| {
+            dbg!(err);
+        })?
+        .ok_or(())
+}
+
 pub(crate) fn post<Q: QueryableAndLastInsert>(
     user_id: u64,
     post: &str,

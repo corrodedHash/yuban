@@ -1,5 +1,9 @@
 use crate::db;
-use mysql::prelude::{FromRow, Queryable};
+use db::transactional;
+use mysql::{
+    params,
+    prelude::{FromRow, Queryable},
+};
 use rocket::{http::Status, request::FromRequest, Route, State};
 
 use super::InternalDebugFailure;
@@ -80,8 +84,9 @@ fn add_user(
 
 #[derive(Debug, serde::Serialize)]
 struct GroupSummary {
+    groupid: u64,
     groupname: String,
-    users: String,
+    users: Option<String>,
 }
 
 impl FromRow for GroupSummary {
@@ -89,8 +94,13 @@ impl FromRow for GroupSummary {
     where
         Self: Sized,
     {
-        let (groupname, users): (String, String) = mysql::prelude::FromRow::from_row_opt(row)?;
-        Ok(Self { groupname, users })
+        let (groupid, groupname, users): (u64, String, Option<String>) =
+            mysql::prelude::FromRow::from_row_opt(row)?;
+        Ok(Self {
+            groupid,
+            groupname,
+            users,
+        })
     }
 }
 
@@ -103,12 +113,103 @@ fn summarize_groups(
     let mut conn = db.get_conn()?;
     let statement = conn.prep(STATEMENT_STRING)?;
     let result: Vec<GroupSummary> = conn.exec(statement, ())?;
-
     Ok(rocket::response::content::Json(serde_json::to_string(
         &result,
     )?))
 }
 
+#[derive(serde::Deserialize)]
+struct GroupName(String);
+
+#[rocket::put("/group", data = "<data>")]
+fn add_group(
+    _user: AuthorizedAdmin,
+    db: State<db::YubanDatabase>,
+    data: rocket_contrib::json::Json<GroupName>,
+) -> Result<rocket::response::content::Json<String>, InternalDebugFailure> {
+    const STATEMENT_STRING: &str = concat!("INSERT INTO Groups (groupname) VALUES (:groupname)");
+    let mut conn = db.get_conn()?;
+    let mut transaction = conn.start_transaction(mysql::TxOpts::default())?;
+    let statement = transaction.prep(STATEMENT_STRING)?;
+    transaction.exec_drop(statement, params! {"groupname" => &data.0.0})?;
+    let group_id = transaction.last_insert_id().unwrap();
+    transaction.commit()?;
+    Ok(rocket::response::content::Json(group_id.to_string()))
+}
+
+#[rocket::delete("/group", data = "<data>")]
+fn remove_group(
+    _user: AuthorizedAdmin,
+    db: State<db::YubanDatabase>,
+    data: rocket_contrib::json::Json<GroupName>,
+) -> Result<Status, InternalDebugFailure> {
+    const STATEMENT_STRING: &str = concat!("DELETE FROM Groups WHERE groupname = :groupname");
+    let mut conn = db.get_conn()?;
+    let statement = conn.prep(STATEMENT_STRING)?;
+    conn.exec_drop(statement, params! {"groupname" => &data.0.0})?;
+
+    Ok(Status::Ok)
+}
+
+#[derive(serde::Deserialize)]
+struct GroupUser {
+    username: String,
+    groupname: String,
+}
+
+#[rocket::put("/group_user", data = "<data>")]
+fn add_group_user(
+    _user: AuthorizedAdmin,
+    db: State<db::YubanDatabase>,
+    data: rocket_contrib::json::Json<GroupUser>,
+) -> Result<Status, InternalDebugFailure> {
+    const STATEMENT_STRING: &str =
+        concat!("INSERT INTO GroupMembership (groupid, userid) VALUES (:groupid, :userid)");
+    let mut conn = db.get_conn()?;
+    let mut transaction = conn.start_transaction(mysql::TxOpts::default())?;
+    let userid = transactional::get_user_id(&data.username, &mut transaction)
+        .map_err(|_| Status::BadRequest)?;
+    let groupid = transactional::get_group_id(&data.groupname, &mut transaction)
+        .map_err(|_| Status::BadRequest)?;
+    let statement = transaction.prep(STATEMENT_STRING)?;
+    transaction.exec_drop(
+        statement,
+        params! {"groupid" => groupid, "userid" => userid},
+    )?;
+    transaction.commit()?;
+    Ok(Status::Ok)
+}
+
+#[rocket::delete("/group_user", data = "<data>")]
+fn remove_group_user(
+    _user: AuthorizedAdmin,
+    db: State<db::YubanDatabase>,
+    data: rocket_contrib::json::Json<GroupUser>,
+) -> Result<Status, InternalDebugFailure> {
+    const STATEMENT_STRING: &str =
+        concat!("DELETE FROM GroupMembership WHERE userid = :userid AND groupid = :groupid");
+    let mut conn = db.get_conn()?;
+    let mut transaction = conn.start_transaction(mysql::TxOpts::default())?;
+    let userid = transactional::get_user_id(&data.username, &mut transaction)?;
+    let groupid = transactional::get_group_id(&data.groupname, &mut transaction)?;
+    let statement = transaction.prep(STATEMENT_STRING)?;
+    transaction.exec_drop(
+        statement,
+        params! {"groupid" => groupid, "userid" => userid},
+    )?;
+    transaction.commit()?;
+    Ok(Status::Ok)
+}
+
 pub fn get_admin_routes() -> impl Into<Vec<Route>> {
-    rocket::routes![add_user, remove_user, list_users, summarize_groups]
+    rocket::routes![
+        add_user,
+        remove_user,
+        list_users,
+        summarize_groups,
+        add_group,
+        remove_group,
+        add_group_user,
+        remove_group_user,
+    ]
 }

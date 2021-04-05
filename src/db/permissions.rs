@@ -46,7 +46,7 @@ pub fn view_thread<Q: Queryable>(
 ) -> Result<bool, ()> {
     const STATEMENT_STRING: &str = concat!(
         "SELECT 1 FROM GroupMembership ",
-        "JOIN Threads ON GroupMembership.groupid = Threads.group ",
+        "JOIN Threads ON GroupMembership.groupid = Threads.groupid ",
         "WHERE GroupMembership.userid = :user_id AND Threads.id = :thread_id"
     );
     let p = params! {
@@ -84,7 +84,7 @@ pub fn add_correction<Q: Queryable>(
 ) -> Result<bool, ()> {
     const STATEMENT_STRING: &str = concat!(
         "SELECT 1 FROM GroupMembership ",
-        "JOIN Threads ON GroupMembership.groupid = Threads.group ",
+        "JOIN Threads ON GroupMembership.groupid = Threads.groupid ",
         "JOIN Originals ON Originals.thread_id = Threads.id ",
         "JOIN Corrections ON Corrections.orig_id = Originals.post_id ",
         "WHERE GroupMembership.userid = :userid AND Corrections.post_id = :postid ",

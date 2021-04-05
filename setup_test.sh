@@ -18,14 +18,8 @@ else
 
     sleep 2
 
-    (
-        cd server;
-        YUBAN_ADD_USER_PW=adminpw YUBAN_MYSQL_PASSWORD=secret \
-        cargo run -- -c -s ${WEBPAGE_PATH} --mysql-port "${MYSQL_PORT}" --add-user admin
-    )
+    YUBAN_ADD_USER_PW=adminpw YUBAN_MYSQL_PASSWORD=secret \
+    cargo run -- -c -s ${WEBPAGE_PATH} --mysql-port "${MYSQL_PORT}" --add-user admin
     exit
 fi
-(
-    cd server;
-    YUBAN_MYSQL_PASSWORD=secret cargo run -- -c -s ${WEBPAGE_PATH} --mysql-port "${MYSQL_PORT}"
-)
+YUBAN_MYSQL_PASSWORD=secret cargo run -- -c -s ${WEBPAGE_PATH} --mysql-port "${MYSQL_PORT}"

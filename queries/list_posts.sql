@@ -1,28 +1,17 @@
 SELECT
-    Threads.id AS id,
-    Threads.opened_on AS opened_on,
-    threaduser.username as user,
-    JSON_OBJECT(
-        'id',
-        Posts.id,
-        'date',
-        Posts.postdate,
-        'ellipsis',
-        SUBSTRING(Posts.post, 1, 10),
-        'user',
-        Users.username,
-        'lang',
-        Originals.langcode,
-        'corrections',
-        Corr.corrsum
-    ) AS post
+    Posts.id AS post_id,
+    Posts.postdate AS postdate,
+    SUBSTRING(Posts.post, 1, 10) AS ellipsis,
+    Users.username AS username,
+    Originals.langcode AS lang,
+    Corr.corrsum AS corrections
 FROM
     Posts
-    INNER JOIN Users ON Posts.userid = Users.id
-    INNER JOIN Originals ON Posts.id = Originals.post_id
-    INNER JOIN Threads ON Threads.id = Originals.thread_id
-    INNER JOIN Users threaduser ON Threads.owner_id = threaduser.id
-    INNER JOIN (
+    JOIN Users ON Posts.userid = Users.id
+    JOIN Originals ON Posts.id = Originals.post_id
+    JOIN Threads ON Threads.id = Originals.thread_id
+    JOIN Users threaduser ON Threads.owner_id = threaduser.id
+    JOIN (
         SELECT
             Originals.post_id AS post_id,
             JSON_ARRAYAGG(corr_summary.corrsum) AS corrsum
@@ -41,8 +30,8 @@ FROM
                     ) AS corrsum
                 FROM
                     Corrections
-                    INNER JOIN Posts ON Posts.id = Corrections.post_id
-                    INNER JOIN Users ON Users.id = Posts.userid
+                    JOIN Posts ON Posts.id = Corrections.post_id
+                    JOIN Users ON Users.id = Posts.userid
             ) corr_summary ON Originals.post_id = corr_summary.orig_id
         GROUP BY
             Originals.post_id

@@ -4,7 +4,7 @@ SELECT
     COUNT(Threads.id) as threadcount
 FROM
     Groups
-    JOIN Threads ON Groups.id = Threads.group
+    JOIN Threads ON Groups.id = Threads.groupid
     JOIN GroupMembership ON GroupMembership.groupid = Groups.id
     JOIN Users ON GroupMembership.userid = Users.id
 WHERE

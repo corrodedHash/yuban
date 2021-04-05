@@ -32,26 +32,14 @@ impl mysql::prelude::FromRow for GroupSummary {
 }
 
 #[rocket::get("/summary")]
-pub fn list_groups(
+pub(super) fn list_groups(
     user: AuthorizedUser,
     db: State<YubanDatabase>,
-) -> Result<rocket::response::content::Json<String>, Status> {
-    let mut conn = db.get_conn().map_err(|err| {
-        dbg!(err);
-        Status::BadGateway
-    })?;
-    let statement = conn.prep(load_query!("list_groups.sql")).map_err(|err| {
-        dbg!(err);
-        Status::BadGateway
-    })?;
-    let group: GroupSummary = conn
-        .exec_first(statement, params! {"username" => user.username})
-        .map_err(|err| {
-            dbg!(err);
-        })
-        .and_then(|p| p.ok_or(()))
-        .map_err(|_| Status::InternalServerError)?;
-    let json_post = serde_json::to_string(&group).map_err(|_| Status::InternalServerError)?;
+) -> Result<rocket::response::content::Json<String>, InternalDebugFailure> {
+    let mut conn = db.get_conn()?;
+    let statement = conn.prep(load_query!("list_groups.sql"))?;
+    let group: Vec<GroupSummary> = conn.exec(statement, params! {"username" => user.username})?;
+    let json_post = serde_json::to_string(&group)?;
     Ok(rocket::response::content::Json(json_post))
 }
 
@@ -94,10 +82,8 @@ pub(super) fn list_threads(
         return Err(Status::Unauthorized.into());
     }
     let statement = conn.prep(load_query!("list_threads.sql"))?;
-    let group: ThreadSummary = conn
-        .exec_first(statement, params! {"groupid" => group_id})?
-        .ok_or(())?;
-    let json_post = serde_json::to_string(&group).map_err(|_| Status::InternalServerError)?;
+    let group: Vec<ThreadSummary> = conn.exec(statement, params! {"groupid" => group_id})?;
+    let json_post = serde_json::to_string(&group)?;
     Ok(rocket::response::content::Json(json_post))
 }
 
@@ -105,8 +91,10 @@ pub(super) fn list_threads(
 struct PostSummary {
     id: u64,
     opened_on: SkyDate,
-    user: String,
-    post: String,
+    ellipsis: String,
+    username: String,
+    lang: String,
+    corrections: String,
 }
 
 impl mysql::prelude::FromRow for PostSummary {
@@ -114,12 +102,15 @@ impl mysql::prelude::FromRow for PostSummary {
     where
         Self: Sized,
     {
-        let (id, opened_on, user, post) = mysql::prelude::FromRow::from_row_opt(row)?;
+        let (id, opened_on, ellipsis, username, lang, corrections) =
+            mysql::prelude::FromRow::from_row_opt(row)?;
         Ok(Self {
             id,
             opened_on,
-            user,
-            post,
+            ellipsis,
+            username,
+            lang,
+            corrections,
         })
     }
 }
@@ -138,9 +129,7 @@ pub(super) fn list_posts(
     }
 
     let statement = conn.prep(load_query!("list_posts.sql"))?;
-    let group: PostSummary = conn
-        .exec_first(statement, params! {"thread_id" => thread_id})?
-        .ok_or(())?;
+    let group: Vec<PostSummary> = conn.exec(statement, params! {"thread_id" => thread_id})?;
     let json_post = serde_json::to_string(&group)?;
     Ok(rocket::response::content::Json(json_post))
 }
