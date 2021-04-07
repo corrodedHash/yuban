@@ -37,3 +37,5 @@ GROUP BY
     Threads.id,
     Threads.creator,
     Threads.opened_on
+ORDER BY
+    Threads.opened_on DESC

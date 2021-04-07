@@ -46,7 +46,7 @@ pub fn logout_post(
 ) -> Result<rocket::response::content::Json<String>, Status> {
     db.remove_token(user.userid, user.token)
         .map_err(|_| Status::BadGateway)?;
-    cookies.remove(Cookie::named("token"));
+    cookies.remove(Cookie::build("token", "").path("/").finish());
     Ok(rocket::response::content::Json("true".to_owned()))
 }
 

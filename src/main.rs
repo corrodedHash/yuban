@@ -79,6 +79,7 @@ fn main() {
         if let Ok(password) = std::env::var("YUBAN_ADD_USER_PW") {
             db.new_login(&username, &password)
                 .expect("Could not add user");
+            return;
         } else {
             eprintln!(
                 "Please define YUBAN_ADD_USER_PW environment variable as password for {}",

@@ -18,7 +18,7 @@ FROM
             Originals.post_id AS post_id,
             CONCAT(
                 "[",
-                GROUP_CONCAT(JSON_QUOTE(corr_summary.corrsum)),
+                GROUP_CONCAT(corr_summary.corrsum),
                 "]"
             ) AS corrsum
         FROM

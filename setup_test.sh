@@ -16,7 +16,7 @@ else
     -p 127.0.0.1:52583:3306 \
     --name test_db yuban-db
 
-    sleep 2
+    sleep 10
 
     YUBAN_ADD_USER_PW=adminpw YUBAN_MYSQL_PASSWORD=secret \
     cargo run -- -c -s ${WEBPAGE_PATH} --mysql-port "${MYSQL_PORT}" --add-user admin
