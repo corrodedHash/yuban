@@ -6,7 +6,6 @@ pub use api::LangCode;
 mod admin;
 pub use admin::get_admin_routes;
 use rocket::http::Status;
-
 #[derive(Debug, Clone)]
 struct InternalDebugFailure(Status);
 

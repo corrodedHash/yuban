@@ -79,6 +79,14 @@ pub fn view_post<Q: Queryable>(
 
 pub fn add_correction<Q: Queryable>(
     user_id: u64,
+    post_id: u64,
+    transaction: &mut Q,
+) -> Result<bool, ()> {
+    view_post(user_id, post_id, transaction)
+}
+
+pub fn view_correction<Q: Queryable>(
+    user_id: u64,
     orig_postid: u64,
     transaction: &mut Q,
 ) -> Result<bool, ()> {

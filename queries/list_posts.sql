@@ -4,17 +4,23 @@ SELECT
     SUBSTRING(Posts.post, 1, 10) AS ellipsis,
     Users.username AS username,
     Originals.langcode AS lang,
-    Corr.corrsum AS corrections
+    CASE
+        WHEN Corr.corrsum IS NULL THEN "[]"
+        ELSE Corr.corrsum
+    END AS corrections
 FROM
     Posts
     JOIN Users ON Posts.userid = Users.id
     JOIN Originals ON Posts.id = Originals.post_id
     JOIN Threads ON Threads.id = Originals.thread_id
-    JOIN Users threaduser ON Threads.owner_id = threaduser.id
     JOIN (
         SELECT
             Originals.post_id AS post_id,
-            JSON_ARRAYAGG(corr_summary.corrsum) AS corrsum
+            CONCAT(
+                "[",
+                GROUP_CONCAT(JSON_QUOTE(corr_summary.corrsum)),
+                "]"
+            ) AS corrsum
         FROM
             Originals
             LEFT JOIN (

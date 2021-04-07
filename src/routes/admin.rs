@@ -113,9 +113,8 @@ fn summarize_groups(
     let mut conn = db.get_conn()?;
     let statement = conn.prep(STATEMENT_STRING)?;
     let result: Vec<GroupSummary> = conn.exec(statement, ())?;
-    Ok(rocket::response::content::Json(serde_json::to_string(
-        &result,
-    )?))
+    let json_result = serde_json::to_string(&result)?;
+    Ok(rocket::response::content::Json(json_result))
 }
 
 #[derive(serde::Deserialize)]

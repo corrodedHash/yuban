@@ -2,25 +2,38 @@ SELECT
     Threads.id,
     Users.username,
     Threads.opened_on,
-    JSON_ARRAYAGG(Originals.langcode),
-    JSON_ARRAYAGG(corr_counts.counts)
+    CONCAT(
+        "[",
+        GROUP_CONCAT(translations.langs),
+        "]"
+    ) AS translation_languages
 FROM
     Threads
-    JOIN Originals ON Threads.id = Originals.thread_id
+    JOIN Users ON Users.id = Threads.creator
     LEFT JOIN (
         SELECT
-            Corrections.orig_id,
-            as orig_id,
-            COUNT(Corrections.post_id) as counts
+            Originals.thread_id,
+            JSON_OBJECT(
+                'lang',
+                Originals.langcode,
+                'count',
+                corr_counts.counts
+            ) AS langs
         FROM
-            Corrections
-        GROUP BY
-            Corrections.orig_id
-    ) corr_counts ON corr_counts.orig_id = Originals.post_id
-    JOIN Users ON Users.id = Threads.creator
+            Originals
+            LEFT JOIN(
+                SELECT
+                    Corrections.orig_id AS orig_id,
+                    COUNT(Corrections.post_id) AS counts
+                FROM
+                    Corrections
+                GROUP BY
+                    Corrections.orig_id
+            ) corr_counts ON corr_counts.orig_id = Originals.post_id
+    ) translations ON translations.thread_id = Threads.id
+WHERE
+    Threads.groupid = :groupid
 GROUP BY
     Threads.id,
     Threads.creator,
     Threads.opened_on
-WHERE
-    Threads.groupid = :groupid

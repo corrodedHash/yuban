@@ -48,8 +48,7 @@ struct ThreadSummary {
     id: u64,
     creator: String,
     opened_on: crate::db::SkyDate,
-    langcodes: String,
-    correction_counts: String,
+    languages: String,
 }
 
 impl mysql::prelude::FromRow for ThreadSummary {
@@ -57,14 +56,12 @@ impl mysql::prelude::FromRow for ThreadSummary {
     where
         Self: Sized,
     {
-        let (id, creator, opened_on, langcodes, correction_counts) =
-            mysql::prelude::FromRow::from_row_opt(row)?;
+        let (id, creator, opened_on, languages) = mysql::prelude::FromRow::from_row_opt(row)?;
         Ok(Self {
             id,
             creator,
             opened_on,
-            langcodes,
-            correction_counts,
+            languages,
         })
     }
 }
