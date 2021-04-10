@@ -92,7 +92,7 @@ pub(super) fn new_translation(
         .map(|_| post_id)?;
 
     transaction.commit()?;
-    return Ok(post_id.to_string());
+    Ok(post_id.to_string())
 }
 
 #[rocket::put("/addcorrection/<origpostid>", data = "<data>")]
