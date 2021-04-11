@@ -13,6 +13,7 @@ pub mod transactional;
 pub struct SkyDate(#[serde(serialize_with = "serialize_date")] pub mysql::Value);
 
 impl ConvIr<SkyDate> for mysql::Value {
+    #[allow(clippy::wrong_self_convention)]
     fn new(v: mysql::Value) -> Result<Self, mysql::FromValueError> {
         Ok(v)
     }
