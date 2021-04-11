@@ -19,7 +19,14 @@ else
     sleep 10
 
     YUBAN_ADD_USER_PW=adminpw YUBAN_MYSQL_PASSWORD=secret \
-    cargo run -- -c -s ${WEBPAGE_PATH} --mysql-port "${MYSQL_PORT}" --add-user admin
+    cargo run -- --mysql-port "${MYSQL_PORT}" --add-user admin
     exit
 fi
-YUBAN_MYSQL_PASSWORD=secret cargo run -- -c -s ${WEBPAGE_PATH} --mysql-port "${MYSQL_PORT}"
+
+(
+    cd ../client;
+    echo running
+    npm run serve;
+)&
+
+YUBAN_MYSQL_PASSWORD=secret cargo run -- --mysql-port "${MYSQL_PORT}"
