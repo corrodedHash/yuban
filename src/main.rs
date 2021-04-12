@@ -39,6 +39,7 @@ fn standard_server(rocket: Rocket) -> Rocket {
         .mount("/r", routes::get_fix_routes())
         .mount("/api", routes::get_api_routes())
         .mount("/api/admin", routes::get_admin_routes())
+        .mount("/api", routes::get_meta_routes())
 }
 
 fn complete_server(rocket: Rocket, static_file_path: PathBuf) -> Rocket {

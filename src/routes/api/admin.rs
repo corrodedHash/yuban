@@ -6,7 +6,7 @@ use mysql::{
 };
 use rocket::{http::Status, request::FromRequest, Route, State};
 
-use super::InternalDebugFailure;
+use crate::routes::InternalDebugFailure;
 
 struct AuthorizedAdmin {
     pub username: String,

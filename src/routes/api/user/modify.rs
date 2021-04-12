@@ -5,7 +5,8 @@ use rocket::{http::Status, State};
 
 use crate::{auth::AuthorizedUser, db};
 
-use super::{super::InternalDebugFailure, LangCode};
+use super::LangCode;
+use crate::routes::InternalDebugFailure;
 
 pub(super) struct BoundedPost {
     post: String,

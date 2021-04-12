@@ -2,10 +2,13 @@ SELECT
     Threads.id,
     Users.username,
     Threads.opened_on,
-    CONCAT(
-        "[",
-        GROUP_CONCAT(translations.langs),
-        "]"
+    COALESCE(
+        CONCAT(
+            "[",
+            GROUP_CONCAT(translations.langs),
+            "]"
+        ),
+        "[]"
     ) AS translation_languages
 FROM
     Threads

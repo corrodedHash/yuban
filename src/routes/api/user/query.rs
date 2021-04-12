@@ -7,8 +7,8 @@ use crate::{
     load_query,
 };
 
-use super::super::InternalDebugFailure;
 use super::LangCode;
+use crate::routes::InternalDebugFailure;
 
 #[derive(Debug, Clone, serde::Serialize)]
 struct GroupSummary {

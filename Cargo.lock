@@ -2138,6 +2138,7 @@ version = "0.1.0"
 dependencies = [
  "base64 0.13.0",
  "clap",
+ "lazy_static",
  "mysql",
  "rand 0.8.3",
  "rocket",
