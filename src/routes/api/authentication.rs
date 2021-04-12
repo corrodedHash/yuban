@@ -1,4 +1,8 @@
-use rocket::{State, http::{Cookie, Cookies, Status}, request::FromRequest};
+use rocket::{
+    http::{Cookie, Cookies, Status},
+    request::FromRequest,
+    State,
+};
 
 use crate::{auth::AuthorizedUser, db};
 
@@ -48,13 +52,14 @@ pub fn logout_post(
 }
 
 #[rocket::get("/testtoken")]
-pub fn test_token(user: Result<AuthorizedUser, <AuthorizedUser as FromRequest>::Error>) -> Result<rocket::response::content::Json<String>, Status> {
+pub fn test_token(
+    user: Result<AuthorizedUser, <AuthorizedUser as FromRequest>::Error>,
+) -> Result<rocket::response::content::Json<String>, Status> {
     match user {
-        Ok(user) => {    Ok(rocket::response::content::Json(format!("{{\"username\": \"{}\"}}", user.username)))
-    }
-        Err(_) => {
-    Ok(rocket::response::content::Json("null".to_owned()))
-
-        }
+        Ok(user) => Ok(rocket::response::content::Json(format!(
+            "{{\"username\": \"{}\"}}",
+            user.username
+        ))),
+        Err(_) => Ok(rocket::response::content::Json("null".to_owned())),
     }
 }

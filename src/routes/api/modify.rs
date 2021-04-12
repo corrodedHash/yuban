@@ -36,7 +36,7 @@ pub(super) fn new_thread(
     data: BoundedPost,
     group_id: u64,
     db: State<db::YubanDatabase>,
-) -> Result<String, InternalDebugFailure> {
+) -> Result<rocket::response::content::Json<String>, InternalDebugFailure> {
     const STATEMENT_STRING: &str = concat!(
         "INSERT INTO Threads (creator, groupid, opened_on) ",
         "VALUES (:owner_id, :group_id, CURRENT_TIMESTAMP) "
@@ -49,23 +49,23 @@ pub(super) fn new_thread(
     }
 
     let mut transaction = conn.start_transaction(mysql::TxOpts::default())?;
-    let user_id = crate::db::transactional::get_user_id(&user.username, &mut transaction)?;
 
     let statement = transaction.prep(STATEMENT_STRING)?;
-    let params = params! {"owner_id" => user_id, "group_id" => group_id};
+    let params = params! {"owner_id" => user.userid, "group_id" => group_id};
     transaction.exec_drop(statement, params)?;
     let thread_id = transaction.last_insert_id().ok_or(())?;
-    let post_id = crate::db::transactional::post(user_id, &data.post, &mut transaction)?;
+    let post_id = crate::db::transactional::post(user.userid, &data.post, &mut transaction)?;
     crate::db::transactional::link_orig(thread_id, post_id, &langcode.0, &mut transaction)
         .map(|_| post_id)?;
 
     transaction.commit()?;
-    Ok(serde_json::to_string(&serde_json::json!({
-        "thread_id": thread_id,
-        "post_id": post_id
-    }))?)
+    Ok(rocket::response::content::Json(serde_json::to_string(
+        &serde_json::json!({
+            "thread_id": thread_id,
+            "post_id": post_id
+        }),
+    )?))
 }
-
 #[rocket::put("/addpost/<thread_id>/<langcode>", data = "<data>")]
 pub(super) fn new_translation(
     user: AuthorizedUser,
@@ -122,4 +122,70 @@ pub(super) fn new_correction(
     transaction.exec_drop(statement, params)?;
     transaction.commit()?;
     Ok(postid.to_string())
+}
+
+#[allow(unused_variables, unreachable_code)]
+#[rocket::delete("/thread/<thread_id>")]
+pub(super) fn delete_thread(
+    user: AuthorizedUser,
+    thread_id: u64,
+    db: State<db::YubanDatabase>,
+) -> Result<rocket::response::content::Json<&str>, InternalDebugFailure> {
+    return Err(Status::ServiceUnavailable.into());
+
+    const STATEMENT_STRING: &str = concat!(
+        "DELETE FROM Threads WHERE ",
+        "Threads.id = :thread_id AND Threads.creator = :creator"
+    );
+    let mut conn = db.get_conn()?;
+
+    let mut transaction = conn.start_transaction(mysql::TxOpts::default())?;
+
+    let statement = transaction.prep(STATEMENT_STRING)?;
+    let params = params! {"thread_id" => thread_id, "creator" => user.userid};
+    transaction.exec_drop(statement, params)?;
+    let deletion_worked = transaction.affected_rows() > 0;
+
+    transaction.commit()?;
+    Ok(rocket::response::content::Json(if deletion_worked {
+        "true"
+    } else {
+        "false"
+    }))
+}
+
+#[rocket::delete("/post/<post_id>")]
+pub(super) fn delete_post(
+    user: AuthorizedUser,
+    post_id: u64,
+    db: State<db::YubanDatabase>,
+) -> Result<rocket::response::content::Json<&str>, InternalDebugFailure> {
+    const STATEMENT_STRING: &str = concat!(
+        "DELETE FROM Posts WHERE ",
+        "id = :post_id AND userid = :userid"
+    );
+    let mut conn = db.get_conn()?;
+
+    let mut transaction = conn.start_transaction(mysql::TxOpts::default())?;
+
+    let statement = transaction.prep(STATEMENT_STRING)?;
+    let params = params! {"post_id" => post_id, "userid" => user.userid};
+    transaction.exec_drop(statement, params)?;
+    let deletion_worked = transaction.affected_rows() > 0;
+
+    transaction.commit()?;
+    Ok(rocket::response::content::Json(if deletion_worked {
+        "true"
+    } else {
+        "false"
+    }))
+}
+
+#[rocket::delete("/correction/<post_id>")]
+pub(super) fn delete_correction(
+    user: AuthorizedUser,
+    post_id: u64,
+    db: State<db::YubanDatabase>,
+) -> Result<rocket::response::content::Json<&str>, InternalDebugFailure> {
+    delete_post(user, post_id, db)
 }

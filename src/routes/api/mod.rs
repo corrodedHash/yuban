@@ -30,6 +30,9 @@ pub fn get_api_routes() -> impl Into<Vec<rocket::Route>> {
         query::single_post,
         modify::new_thread,
         modify::new_translation,
-        modify::new_correction
+        modify::new_correction,
+        modify::delete_thread,
+        modify::delete_post,
+        modify::delete_correction,
     ]
 }
