@@ -23,10 +23,11 @@ else
     exit
 fi
 
-(
-    cd ../client;
-    echo running
-    npm run serve;
-)&
 
-YUBAN_MYSQL_PASSWORD=secret cargo run -- --mysql-port "${MYSQL_PORT}"
+tmux \
+    new-session  'cd ../client; echo running ; npm run serve' \; \
+    set-option remain-on-exit on \; \
+    split-window -h "YUBAN_MYSQL_PASSWORD=secret cargo run -- --mysql-port '${MYSQL_PORT}'" \; \
+    set-option remain-on-exit on \; \
+
+
