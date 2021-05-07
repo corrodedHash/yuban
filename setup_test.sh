@@ -20,7 +20,6 @@ else
 
     YUBAN_ADD_USER_PW=adminpw YUBAN_MYSQL_PASSWORD=secret \
     cargo run -- --mysql-port "${MYSQL_PORT}" --add-user admin
-    exit
 fi
 
 

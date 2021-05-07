@@ -30,7 +30,7 @@ impl rocket::data::FromDataSimple for BoundedPost {
     }
 }
 
-#[rocket::put("/addthread/<group_id>/<langcode>", data = "<data>")]
+#[rocket::post("/thread/<group_id>/<langcode>", data = "<data>")]
 pub(super) fn new_thread(
     user: AuthorizedUser,
     langcode: LangCode,
@@ -67,7 +67,7 @@ pub(super) fn new_thread(
         }),
     )?))
 }
-#[rocket::put("/addpost/<thread_id>/<langcode>", data = "<data>")]
+#[rocket::post("/post/<thread_id>/<langcode>", data = "<data>")]
 pub(super) fn new_translation(
     user: AuthorizedUser,
     data: BoundedPost,
@@ -96,7 +96,7 @@ pub(super) fn new_translation(
     Ok(post_id.to_string())
 }
 
-#[rocket::put("/addcorrection/<origpostid>", data = "<data>")]
+#[rocket::post("/correction/<origpostid>", data = "<data>")]
 pub(super) fn new_correction(
     user: AuthorizedUser,
     data: BoundedPost,
